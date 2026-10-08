@@ -10,11 +10,10 @@ import (
 )
 
 func main() {
-	if os.Getenv("PGPASSWORD") == "" {
-		log.Fatal("Set PGPASSWORD before running this command")
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("Set DATABASE_URL before running this command")
 	}
-
-	dsn := "host=localhost port=5432 user=postgres dbname=foodhub sslmode=disable connect_timeout=5"
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
