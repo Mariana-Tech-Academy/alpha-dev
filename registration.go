@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -14,12 +15,12 @@ import (
 )
 
 type RegisterRequest struct {
-	FirstName       string `json:"first_name"`       // First name.
-	LastName        string `json:"last_name"`        // Last name.
-	Email           string `json:"email"`            // Email address.
-	PhoneNumber     string `json:"phone_number"`     // Phone number.
-	Password        string `json:"password"`         // Password to hash.
-	ConfirmPassword string `json:"confirm_password"` // Must match.
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
+	Email           string `json:"email"`
+	PhoneNumber     string `json:"phone_number"`
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
 }
 
 // Flow: receive details → validate → check email → hash → save → respond.
@@ -102,6 +103,14 @@ func registerHandler(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 
+		if err := decoder.Decode(&struct{}{}); err != io.EOF {
+			registrationJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"message": "Invalid registration JSON",
+			})
+			return
+		}
+
 		req.FirstName = strings.TrimSpace(req.FirstName)
 		req.LastName = strings.TrimSpace(req.LastName)
 		req.PhoneNumber = strings.TrimSpace(req.PhoneNumber)
@@ -160,7 +169,6 @@ func registerHandler(db *gorm.DB) http.HandlerFunc {
 		if err := database.Create(&user).Error; err != nil {
 			var postgresError *pgconn.PgError
 			if errors.As(err, &postgresError) && postgresError.Code == "23505" {
-				// Also catch duplicates detected during saving.
 				registrationJSON(w, http.StatusConflict, map[string]any{
 					"success": false,
 					"message": "Email is already taken",
@@ -178,7 +186,7 @@ func registerHandler(db *gorm.DB) http.HandlerFunc {
 		registrationJSON(w, http.StatusCreated, map[string]any{
 			"success": true,
 			"message": "Account created successfully",
-			"data": map[string]any{ // Return only these safe fields.
+			"data": map[string]any{ // Return only safe fields.
 				"first_name":   user.FirstName,
 				"last_name":    user.LastName,
 				"email":        user.Email,
