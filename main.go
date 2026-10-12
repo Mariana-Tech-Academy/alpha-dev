@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Mariana-Tech-Academy/alpha-dev/auth"
+	"github.com/Mariana-Tech-Academy/alpha-dev/routes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -33,8 +33,7 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	mux := http.NewServeMux()
-	auth.RegisterRoutes(mux, db, secret)
+	mux := routes.NewRouter(db, secret)
 
 	port := os.Getenv("PORT")
 	if port == "" {
