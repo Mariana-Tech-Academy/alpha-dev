@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"alpha-dev/auth"
 	"alpha-dev/handlers"
 	"alpha-dev/repository"
@@ -10,16 +12,21 @@ import (
 	"gorm.io/gorm"
 )
 
-func UserRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
+func UserRoutes(
+	router *mux.Router,
+	db *gorm.DB,
+	tokens *auth.JWTManager,
+) {
 	repo := repository.NewUserRepository(db)
 	userService := service.NewUserService(repo, tokens)
 	userHandler := handlers.NewUserHandler(userService)
 
-	// public routes: POST /auth/register, POST /auth/login
+	// Public registration: POST /api/auth/register.
 	public := router.PathPrefix("/auth").Subrouter()
+	public.HandleFunc("/register", userHandler.Register).
+		Methods(http.MethodPost)
 
-	// protected routes: POST /auth/logout, GET /auth/me, PUT /users/me, PUT /users/me/password
+	// Keep the professor's structure for the other authentication tasks.
 	authed := protected(router, tokens)
-
-	_, _, _ = public, authed, userHandler
+	_ = authed
 }
