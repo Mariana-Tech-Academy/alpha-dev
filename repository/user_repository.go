@@ -5,7 +5,6 @@ import (
 )
 
 type UserRepository interface {
-
 }
 
 type PostgresUserRepo struct {
