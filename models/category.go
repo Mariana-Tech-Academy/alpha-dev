@@ -1,8 +1,9 @@
 package models
 
-// Categories are shared platform-wide (for example Pizza, Drinks, Desserts).
+import "gorm.io/gorm"
+
 type Category struct {
-	Record
-	Name      string     `gorm:"size:100;not null;uniqueIndex" json:"name"`
-	MenuItems []MenuItem `gorm:"foreignKey:CategoryID" json:"-"`
+	gorm.Model
+	Name      string     `gorm:"uniqueIndex;not null" json:"name"`
+	MenuItems []MenuItem `json:"menu_items,omitempty"`
 }

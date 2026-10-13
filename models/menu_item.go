@@ -2,17 +2,16 @@ package models
 
 import "gorm.io/gorm"
 
+// Money fields are stored in minor units
 type MenuItem struct {
-	Record
+	gorm.Model
 	RestaurantID uint       `gorm:"not null;index" json:"restaurant_id"`
-	Restaurant   Restaurant `gorm:"foreignKey:RestaurantID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	Restaurant   Restaurant `json:"restaurant,omitempty"`
 	CategoryID   uint       `gorm:"not null;index" json:"category_id"`
-	Category     Category   `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"category,omitempty"`
-	Name         string     `gorm:"size:150;not null;index" json:"name"`
-	Description  string     `gorm:"type:text" json:"description"`
-	PriceMinor   Money      `gorm:"type:bigint;not null;check:chk_menu_price,price_minor >= 0" json:"price_minor"`
-	ImageURL     string     `gorm:"type:text" json:"image_url"`
-	IsAvailable  bool       `gorm:"not null;index" json:"is_available"`
-	// Soft deletion preserves historical order references.
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Category     Category   `json:"category,omitempty"`
+	Name         string     `gorm:"not null;index" json:"name"`
+	Description  string     `json:"description"`
+	Price        int64      `gorm:"not null;check:price >= 0" json:"price"`
+	ImageURL     string     `json:"image_url"`
+	Available    bool       `gorm:"not null;default:true;index" json:"available"`
 }

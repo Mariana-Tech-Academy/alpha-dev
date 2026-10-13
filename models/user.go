@@ -1,15 +1,32 @@
 package models
 
+import "gorm.io/gorm"
+
+type Role string
+
+const (
+	RoleCustomer Role = "customer"
+	RoleManager  Role = "manager"
+	RoleAdmin    Role = "admin"
+)
+
+type UserStatus string
+
+const (
+	UserStatusActive    UserStatus = "active"
+	UserStatusSuspended UserStatus = "suspended"
+)
+
 type User struct {
-	Record
-	FirstName          string       `gorm:"size:100;not null" json:"first_name"`
-	LastName           string       `gorm:"size:100;not null" json:"last_name"`
-	Email              string       `gorm:"size:254;not null;uniqueIndex" json:"email"`
-	PhoneNumber        string       `gorm:"size:30;not null" json:"phone_number"`
-	PasswordHash       string       `gorm:"size:255;not null" json:"-"`
-	Role               UserRole     `gorm:"size:20;not null;default:customer;index;check:chk_user_role,role IN ('customer','manager','admin')" json:"role"`
-	Status             UserStatus   `gorm:"size:20;not null;default:active;index;check:chk_user_status,status IN ('active','suspended')" json:"status"`
-	Cart               *Cart        `gorm:"foreignKey:UserID" json:"-"`
-	Orders             []Order      `gorm:"foreignKey:CustomerID" json:"-"`
-	ManagedRestaurants []Restaurant `gorm:"foreignKey:ManagerID" json:"-"`
+	gorm.Model
+	FirstName string     `gorm:"not null" json:"first_name"`
+	LastName  string     `gorm:"not null" json:"last_name"`
+	Email     string     `gorm:"uniqueIndex;not null" json:"email"`
+	Phone     string     `gorm:"not null" json:"phone"`
+	Password  string     `gorm:"not null" json:"-"`
+	Role      Role       `gorm:"type:varchar(20);not null;default:customer;index" json:"role"`
+	Status    UserStatus `gorm:"type:varchar(20);not null;default:active;index" json:"status"`
+
+	Cart   *Cart   `json:"cart,omitempty"`
+	Orders []Order `gorm:"foreignKey:CustomerID" json:"orders,omitempty"`
 }
