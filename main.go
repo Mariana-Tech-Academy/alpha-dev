@@ -48,12 +48,13 @@ func main() {
 		&models.CartItem{},
 		&models.Order{},
 		&models.OrderItem{},
+		&models.RevokedToken{},
 	)
 	if err != nil {
 		log.Fatal("failed to automigrate: ", err)
 	}
 
-	tokens := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry)
+	tokens := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, db)
 	router := routes.Router(db, tokens)
 
 	server := &http.Server{

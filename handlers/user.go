@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"alpha-dev/auth"
 	"alpha-dev/models"
@@ -74,7 +75,27 @@ func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The frontend must delete its token.
-	// This endpoint does not revoke the JWT on the server.
+	tokenString, ok := strings.CutPrefix(
+		r.Header.Get("Authorization"),
+		"Bearer ",
+	)
+	if !ok || tokenString == "" {
+		utils.Error(
+			w,
+			http.StatusUnauthorized,
+			"missing or malformed authorization header",
+		)
+		return
+	}
+
+	if err := h.UserService.Logout(r.Context(), tokenString); err != nil {
+		utils.Error(
+			w,
+			http.StatusInternalServerError,
+			"unable to log out",
+		)
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

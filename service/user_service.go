@@ -18,6 +18,7 @@ var (
 
 type UserService interface {
 	GetActiveUser(ctx context.Context, id uint) (models.User, error)
+	Logout(ctx context.Context, tokenString string) error
 }
 
 type userService struct {
@@ -46,4 +47,11 @@ func (s *userService) GetActiveUser(ctx context.Context, id uint) (models.User, 
 	}
 
 	return user, nil
+}
+
+func (s *userService) Logout(
+	ctx context.Context,
+	tokenString string,
+) error {
+	return s.tokens.Revoke(ctx, tokenString)
 }
