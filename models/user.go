@@ -30,3 +30,25 @@ type User struct {
 	Cart   *Cart   `json:"cart,omitempty"`
 	Orders []Order `gorm:"foreignKey:CustomerID" json:"orders,omitempty"`
 }
+
+
+type ProfileUpdate struct {
+
+	FirstName string ` json:"first_name"`
+	LastName  string ` json:"last_name"`
+	Email     string ` json:"email"`
+	Phone string  ` json:"phone_number"`
+}
+
+func (u *User) UpdateProfile (db *gorm.DB, input ProfileUpdate) error {
+	u.FirstName = input.FirstName
+	u.LastName = input.LastName
+	u.Phone = input.Phone
+
+	if input.Email != "" && input.Email != u.Email {
+		u.Email = input.Email
+	}
+
+	return db.Save (u).Error
+
+}
