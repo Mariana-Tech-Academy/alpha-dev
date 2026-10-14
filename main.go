@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"alpha-dev/config"
 	"alpha-dev/middleware"
 	"alpha-dev/models"
+	"alpha-dev/repository"
 	"alpha-dev/routes"
 
 	"gorm.io/driver/postgres"
@@ -34,7 +36,7 @@ func main() {
 	connStr := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s sslmode=%s", host, user, password, port, name, sslmode)
 
 	// open database
-	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{TranslateError: true})
 	if err != nil {
 		log.Fatal("failed to open db: ", err)
 	}
@@ -54,7 +56,10 @@ func main() {
 		log.Fatal("failed to automigrate: ", err)
 	}
 
-	tokens := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, db)
+	revokedTokens := repository.NewRevokedTokenRepository(db)
+	go cleanupRevokedTokens(revokedTokens, time.Hour)
+
+	tokens := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, revokedTokens)
 	router := routes.Router(db, tokens)
 
 	server := &http.Server{
@@ -66,5 +71,14 @@ func main() {
 	log.Printf("server is running on port %s", cfg.Port)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("error starting server: ", err)
+	}
+}
+
+func cleanupRevokedTokens(repo repository.RevokedTokenRepository, interval time.Duration) {
+	for {
+		if err := repo.DeleteExpired(context.Background()); err != nil {
+			log.Printf("delete expired revoked tokens: %v", err)
+		}
+		time.Sleep(interval)
 	}
 }

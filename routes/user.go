@@ -19,12 +19,10 @@ func UserRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 
 	// public routes: POST /auth/register, POST /auth/login
 	public := router.PathPrefix("/auth").Subrouter()
-	_ = public
+	public.HandleFunc("/register", userHandler.Register).Methods(http.MethodPost)
 
-	// protected routes
+	// protected routes: POST /auth/logout, GET /auth/me, PUT /users/me, PUT /users/me/password
 	authed := protected(router, tokens)
 	authed.HandleFunc("/auth/me", userHandler.Me).Methods(http.MethodGet)
 	authed.HandleFunc("/auth/logout", userHandler.Logout).Methods(http.MethodPost)
-
-	// PUT /users/me and PUT /users/me/password are not implemented yet.
 }
