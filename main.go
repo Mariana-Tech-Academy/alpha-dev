@@ -40,7 +40,7 @@ func main() {
 	name := os.Getenv("DB_NAME")
 	sslmode := os.Getenv("SSL_MODE")
 
-	connStr := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s sslmode=%s", 
+	connStr := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s sslmode=%s",
 		host, user, password, port, name, sslmode)
 
 	// 3. Open PostgreSQL database connection
@@ -69,10 +69,10 @@ func main() {
 	db.Model(&models.User{}).Count(&count)
 	if count == 0 {
 		db.Create(&models.User{
-			FirstName:   "Fred",
-			LastName:    "Flinstone",
-			Email:       "Bedrock@telly.com",
-			Phone: "07799 123890",
+			FirstName: "Fred",
+			LastName:  "Flinstone",
+			Email:     "Bedrock@telly.com",
+			Phone:     "07799 123890",
 		})
 		log.Println("Seeded initial test user into PostgreSQL.")
 	}

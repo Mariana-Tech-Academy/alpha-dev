@@ -31,16 +31,14 @@ type User struct {
 	Orders []Order `gorm:"foreignKey:CustomerID" json:"orders,omitempty"`
 }
 
-
 type ProfileUpdate struct {
-
 	FirstName string ` json:"first_name"`
 	LastName  string ` json:"last_name"`
 	Email     string ` json:"email"`
-	Phone string  ` json:"phone_number"`
+	Phone     string ` json:"phone_number"`
 }
 
-func (u *User) UpdateProfile (db *gorm.DB, input ProfileUpdate) error {
+func (u *User) UpdateProfile(db *gorm.DB, input ProfileUpdate) error {
 	u.FirstName = input.FirstName
 	u.LastName = input.LastName
 	u.Phone = input.Phone
@@ -49,6 +47,6 @@ func (u *User) UpdateProfile (db *gorm.DB, input ProfileUpdate) error {
 		u.Email = input.Email
 	}
 
-	return db.Save (u).Error
+	return db.Save(u).Error
 
 }
