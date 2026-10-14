@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"alpha-dev/auth"
 	"alpha-dev/handlers"
 	"alpha-dev/repository"
@@ -17,9 +19,10 @@ func UserRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 
 	// public routes: POST /auth/register, POST /auth/login
 	public := router.PathPrefix("/auth").Subrouter()
+	public.HandleFunc("/register", userHandler.Register).Methods(http.MethodPost)
 
 	// protected routes: POST /auth/logout, GET /auth/me, PUT /users/me, PUT /users/me/password
 	authed := protected(router, tokens)
 
-	_, _, _ = public, authed, userHandler
+	_ = authed
 }

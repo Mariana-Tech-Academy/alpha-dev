@@ -34,7 +34,7 @@ func main() {
 	connStr := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s sslmode=%s", host, user, password, port, name, sslmode)
 
 	// open database
-	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{TranslateError: true})
 	if err != nil {
 		log.Fatal("failed to open db: ", err)
 	}

@@ -1,10 +1,16 @@
 package repository
 
 import (
+	"context"
+
+	"alpha-dev/models"
+
 	"gorm.io/gorm"
 )
 
 type UserRepository interface {
+	EmailExists(ctx context.Context, email string) (bool, error)
+	CreateUser(ctx context.Context, user *models.User) error
 }
 
 type PostgresUserRepo struct {
@@ -13,4 +19,21 @@ type PostgresUserRepo struct {
 
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &PostgresUserRepo{db: db}
+}
+
+// EmailExists expects a lowercased email and includes soft-deleted users,
+// since the unique index on email still covers them.
+func (repo *PostgresUserRepo) EmailExists(ctx context.Context, email string) (bool, error) {
+	var count int64
+	err := repo.db.WithContext(ctx).
+		Unscoped().
+		Model(&models.User{}).
+		Where("email = ?", email).
+		Count(&count).Error
+	return count > 0, err
+}
+
+// CreateUser returns gorm.ErrDuplicatedKey if the email is already taken.
+func (repo *PostgresUserRepo) CreateUser(ctx context.Context, user *models.User) error {
+	return repo.db.WithContext(ctx).Create(user).Error
 }
