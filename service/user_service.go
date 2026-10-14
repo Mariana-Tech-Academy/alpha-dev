@@ -14,7 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrEmailTaken = errors.New("email is already taken")
+var (
+	ErrEmailTaken   = errors.New("email is already taken")
+	ErrUserNotFound = errors.New("user not found")
+	ErrInactiveUser = errors.New("account is not active")
+)
 
 type RegisterRequest struct {
 	FirstName       string `json:"first_name"`
@@ -35,6 +39,8 @@ func (err *RegistrationValidationError) Error() string {
 
 type UserService interface {
 	Register(ctx context.Context, req RegisterRequest) (*models.User, error)
+	GetActiveUser(ctx context.Context, id uint) (models.User, error)
+	Logout(ctx context.Context, claims *auth.Claims) error
 }
 
 type userService struct {
@@ -153,4 +159,27 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*model
 	}
 
 	return user, nil
+}
+
+func (s *userService) GetActiveUser(ctx context.Context, id uint) (models.User, error) {
+	if id == 0 {
+		return models.User{}, ErrUserNotFound
+	}
+
+	user, err := s.userRepo.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return models.User{}, err
+	}
+	if user.Status != models.UserStatusActive {
+		return models.User{}, ErrInactiveUser
+	}
+
+	return user, nil
+}
+
+func (s *userService) Logout(ctx context.Context, claims *auth.Claims) error {
+	return s.tokens.Revoke(ctx, claims)
 }

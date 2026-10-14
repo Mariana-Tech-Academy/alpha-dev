@@ -11,6 +11,7 @@ import (
 type UserRepository interface {
 	EmailExists(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user *models.User) error
+	FindByID(ctx context.Context, id uint) (models.User, error)
 }
 
 type PostgresUserRepo struct {
@@ -36,4 +37,10 @@ func (repo *PostgresUserRepo) EmailExists(ctx context.Context, email string) (bo
 // CreateUser returns gorm.ErrDuplicatedKey if the email is already taken.
 func (repo *PostgresUserRepo) CreateUser(ctx context.Context, user *models.User) error {
 	return repo.db.WithContext(ctx).Create(user).Error
+}
+
+func (repo *PostgresUserRepo) FindByID(ctx context.Context, id uint) (models.User, error) {
+	var user models.User
+	err := repo.db.WithContext(ctx).First(&user, id).Error
+	return user, err
 }

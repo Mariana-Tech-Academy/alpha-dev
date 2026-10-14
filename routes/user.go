@@ -23,6 +23,6 @@ func UserRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 
 	// protected routes: POST /auth/logout, GET /auth/me, PUT /users/me, PUT /users/me/password
 	authed := protected(router, tokens)
-
-	_ = authed
+	authed.HandleFunc("/auth/me", userHandler.Me).Methods(http.MethodGet)
+	authed.HandleFunc("/auth/logout", userHandler.Logout).Methods(http.MethodPost)
 }

@@ -70,6 +70,12 @@ type fakeUserRepo struct {
 	emailExists bool
 	createErr   error
 	created     *models.User
+	found       models.User
+	findErr     error
+}
+
+func (f *fakeUserRepo) FindByID(context.Context, uint) (models.User, error) {
+	return f.found, f.findErr
 }
 
 func (f *fakeUserRepo) EmailExists(context.Context, string) (bool, error) {
@@ -118,7 +124,7 @@ func TestRegister(t *testing.T) {
 		}
 	})
 
-	t.Run("validation error", func(t *testing.T) {
+	t.Run("validation error on empty email", func(t *testing.T) {
 		req := validRequest()
 		req.Email = ""
 		_, err := NewUserService(&fakeUserRepo{}, nil).Register(context.Background(), req)
@@ -127,4 +133,25 @@ func TestRegister(t *testing.T) {
 			t.Fatalf("expected validation error, got %v", err)
 		}
 	})
+}
+
+func TestGetActiveUser(t *testing.T) {
+	tests := []struct {
+		name    string
+		repo    *fakeUserRepo
+		wantErr error
+	}{
+		{"active user", &fakeUserRepo{found: models.User{Status: models.UserStatusActive}}, nil},
+		{"suspended user", &fakeUserRepo{found: models.User{Status: models.UserStatusSuspended}}, ErrInactiveUser},
+		{"missing user", &fakeUserRepo{findErr: gorm.ErrRecordNotFound}, ErrUserNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewUserService(tt.repo, nil).GetActiveUser(context.Background(), 1)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
 }

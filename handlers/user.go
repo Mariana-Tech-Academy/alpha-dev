@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"alpha-dev/auth"
 	"alpha-dev/service"
 	"alpha-dev/utils"
 )
@@ -54,4 +55,45 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w, http.StatusCreated, "account created successfully", user.Profile())
+}
+
+func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	user, err := h.UserService.GetActiveUser(r.Context(), claims.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			utils.Error(w, http.StatusUnauthorized, "user not found")
+		case errors.Is(err, service.ErrInactiveUser):
+			utils.Error(w, http.StatusForbidden, "account is not active")
+		default:
+			log.Printf("get active user %d: %v", claims.UserID, err)
+			utils.Error(w, http.StatusInternalServerError, "unable to retrieve user")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "current user", user.Profile())
+}
+
+// Logout revokes the current token. Suspended users can still log out.
+func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	if err := h.UserService.Logout(r.Context(), claims); err != nil {
+		log.Printf("logout user %d: %v", claims.UserID, err)
+		utils.Error(w, http.StatusInternalServerError, "unable to log out")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

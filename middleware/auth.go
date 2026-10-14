@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"slices"
 	"strings"
@@ -20,9 +22,17 @@ func Authenticate(tokens *auth.JWTManager) func(http.Handler) http.Handler {
 				return
 			}
 
-			claims, err := tokens.Verify(tokenString)
-			if err != nil {
+			claims, err := tokens.Verify(r.Context(), tokenString)
+			switch {
+			case errors.Is(err, auth.ErrTokenRevoked):
+				utils.Error(w, http.StatusUnauthorized, "token has been revoked")
+				return
+			case errors.Is(err, auth.ErrInvalidToken):
 				utils.Error(w, http.StatusUnauthorized, "invalid or expired token")
+				return
+			case err != nil:
+				log.Printf("verify token: %v", err)
+				utils.Error(w, http.StatusInternalServerError, "unable to verify token")
 				return
 			}
 
