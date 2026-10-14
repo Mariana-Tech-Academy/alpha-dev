@@ -2,21 +2,25 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/mail"
 	"strings"
 
 	"alpha-dev/auth"
 	"alpha-dev/models"
 	"alpha-dev/repository"
+	"alpha-dev/utils"
 
-	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
+
+var ErrEmailTaken = errors.New("email is already taken")
 
 type RegisterRequest struct {
 	FirstName       string `json:"first_name"`
 	LastName        string `json:"last_name"`
 	Email           string `json:"email"`
-	PhoneNumber     string `json:"phone_number"`
+	Phone           string `json:"phone"`
 	Password        string `json:"password"`
 	ConfirmPassword string `json:"confirm_password"`
 }
@@ -26,7 +30,7 @@ type RegistrationValidationError struct {
 }
 
 func (err *RegistrationValidationError) Error() string {
-	return "Check the registration fields"
+	return "invalid registration fields"
 }
 
 type UserService interface {
@@ -38,11 +42,22 @@ type userService struct {
 	tokens   *auth.JWTManager
 }
 
-func NewUserService(
-	repo repository.UserRepository,
-	tokens *auth.JWTManager,
-) UserService {
+func NewUserService(repo repository.UserRepository, tokens *auth.JWTManager) UserService {
 	return &userService{userRepo: repo, tokens: tokens}
+}
+
+func validPhone(phone string) bool {
+	digits := 0
+	for _, c := range phone {
+		switch {
+		case c >= '0' && c <= '9':
+			digits++
+		case c == ' ' || c == '+' || c == '-' || c == '(' || c == ')':
+		default:
+			return false
+		}
+	}
+	return digits >= 7
 }
 
 func validateRegistration(req RegisterRequest) map[string]string {
@@ -60,10 +75,12 @@ func validateRegistration(req RegisterRequest) map[string]string {
 		fields["last_name"] = "Last name must not exceed 100 characters"
 	}
 
-	if req.PhoneNumber == "" {
-		fields["phone_number"] = "Phone number is required"
-	} else if len([]rune(req.PhoneNumber)) > 30 {
-		fields["phone_number"] = "Phone number must not exceed 30 characters"
+	if req.Phone == "" {
+		fields["phone"] = "Phone number is required"
+	} else if len([]rune(req.Phone)) > 30 {
+		fields["phone"] = "Phone number must not exceed 30 characters"
+	} else if !validPhone(req.Phone) {
+		fields["phone"] = "Enter a valid phone number"
 	}
 
 	if req.Email == "" {
@@ -75,7 +92,8 @@ func validateRegistration(req RegisterRequest) map[string]string {
 		}
 	}
 
-	// Keep our existing minimum until the team confirms the password rule.
+	// The 8-character minimum is provisional until the team confirms the password rule.
+	// bcrypt only uses the first 72 bytes of a password.
 	if req.Password == "" {
 		fields["password"] = "Password is required"
 	} else if len([]rune(req.Password)) < 8 {
@@ -93,13 +111,10 @@ func validateRegistration(req RegisterRequest) map[string]string {
 	return fields
 }
 
-func (s *userService) Register(
-	ctx context.Context,
-	req RegisterRequest,
-) (*models.User, error) {
+func (s *userService) Register(ctx context.Context, req RegisterRequest) (*models.User, error) {
 	req.FirstName = strings.TrimSpace(req.FirstName)
 	req.LastName = strings.TrimSpace(req.LastName)
-	req.PhoneNumber = strings.TrimSpace(req.PhoneNumber)
+	req.Phone = strings.TrimSpace(req.Phone)
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	if fields := validateRegistration(req); len(fields) > 0 {
@@ -111,13 +126,10 @@ func (s *userService) Register(
 		return nil, err
 	}
 	if exists {
-		return nil, repository.ErrEmailTaken
+		return nil, ErrEmailTaken
 	}
 
-	hash, err := bcrypt.GenerateFromPassword(
-		[]byte(req.Password),
-		bcrypt.DefaultCost,
-	)
+	hash, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -126,13 +138,17 @@ func (s *userService) Register(
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
-		Phone:     req.PhoneNumber,
-		Password:  string(hash), // Store the hash in the professor's Password field.
+		Phone:     req.Phone,
+		Password:  hash,
 		Role:      models.RoleCustomer,
 		Status:    models.UserStatusActive,
 	}
 
+	// The unique index still catches a concurrent registration that passed the check above.
 	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrEmailTaken
+		}
 		return nil, err
 	}
 

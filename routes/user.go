@@ -12,21 +12,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func UserRoutes(
-	router *mux.Router,
-	db *gorm.DB,
-	tokens *auth.JWTManager,
-) {
+func UserRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	repo := repository.NewUserRepository(db)
 	userService := service.NewUserService(repo, tokens)
 	userHandler := handlers.NewUserHandler(userService)
 
-	// Public registration: POST /api/auth/register.
+	// public routes: POST /auth/register, POST /auth/login
 	public := router.PathPrefix("/auth").Subrouter()
-	public.HandleFunc("/register", userHandler.Register).
-		Methods(http.MethodPost)
+	public.HandleFunc("/register", userHandler.Register).Methods(http.MethodPost)
 
-	// Keep the professor's structure for the other authentication tasks.
+	// protected routes: POST /auth/logout, GET /auth/me, PUT /users/me, PUT /users/me/password
 	authed := protected(router, tokens)
+
 	_ = authed
 }
