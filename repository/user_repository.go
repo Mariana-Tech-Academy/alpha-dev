@@ -12,6 +12,7 @@ type UserRepository interface {
 	EmailExists(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user *models.User) error
 	FindByID(ctx context.Context, id uint) (models.User, error)
+	FindByEmail(ctx context.Context, email string) (models.User, error)
 }
 
 type PostgresUserRepo struct {
@@ -42,5 +43,12 @@ func (repo *PostgresUserRepo) CreateUser(ctx context.Context, user *models.User)
 func (repo *PostgresUserRepo) FindByID(ctx context.Context, id uint) (models.User, error) {
 	var user models.User
 	err := repo.db.WithContext(ctx).First(&user, id).Error
+	return user, err
+}
+
+// FindByEmail expects a lowercased email.
+func (repo *PostgresUserRepo) FindByEmail(ctx context.Context, email string) (models.User, error) {
+	var user models.User
+	err := repo.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
 	return user, err
 }

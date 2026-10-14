@@ -5,7 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
+	"alpha-dev/auth"
 	"alpha-dev/models"
 	"alpha-dev/utils"
 
@@ -87,6 +89,10 @@ func (f *fakeUserRepo) CreateUser(_ context.Context, user *models.User) error {
 	return f.createErr
 }
 
+func (f *fakeUserRepo) FindByEmail(context.Context, string) (models.User, error) {
+	return f.found, f.findErr
+}
+
 func TestRegister(t *testing.T) {
 	t.Run("creates active customer with hashed password", func(t *testing.T) {
 		repo := &fakeUserRepo{}
@@ -131,6 +137,77 @@ func TestRegister(t *testing.T) {
 		var validationError *RegistrationValidationError
 		if !errors.As(err, &validationError) {
 			t.Fatalf("expected validation error, got %v", err)
+		}
+	})
+}
+
+type nopRevocations struct{}
+
+func (nopRevocations) IsRevoked(context.Context, string) (bool, error) { return false, nil }
+func (nopRevocations) Revoke(context.Context, string, time.Time) error { return nil }
+
+func TestLogin(t *testing.T) {
+	hash, err := utils.HashPassword("password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := auth.NewJWTManager("test-secret", time.Hour, nopRevocations{})
+	active := models.User{
+		FirstName: "Ada",
+		LastName:  "Lovelace",
+		Email:     "ada@example.com",
+		Phone:     "+447700900123",
+		Password:  hash,
+		Role:      models.RoleCustomer,
+		Status:    models.UserStatusActive,
+	}
+	active.ID = 1
+
+	t.Run("success", func(t *testing.T) {
+		result, err := NewUserService(&fakeUserRepo{found: active}, tokens).Login(context.Background(), LoginRequest{
+			Email:    "  ADA@Example.com ",
+			Password: "password123",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Token == "" {
+			t.Fatal("expected a token")
+		}
+		if result.User.Email != "ada@example.com" {
+			t.Errorf("unexpected profile email: %q", result.User.Email)
+		}
+	})
+
+	t.Run("wrong password", func(t *testing.T) {
+		_, err := NewUserService(&fakeUserRepo{found: active}, tokens).Login(context.Background(), LoginRequest{
+			Email:    "ada@example.com",
+			Password: "wrong",
+		})
+		if !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+		}
+	})
+
+	t.Run("unknown email", func(t *testing.T) {
+		_, err := NewUserService(&fakeUserRepo{findErr: gorm.ErrRecordNotFound}, tokens).Login(context.Background(), LoginRequest{
+			Email:    "missing@example.com",
+			Password: "password123",
+		})
+		if !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+		}
+	})
+
+	t.Run("suspended user", func(t *testing.T) {
+		suspended := active
+		suspended.Status = models.UserStatusSuspended
+		_, err := NewUserService(&fakeUserRepo{found: suspended}, tokens).Login(context.Background(), LoginRequest{
+			Email:    "ada@example.com",
+			Password: "password123",
+		})
+		if !errors.Is(err, ErrInactiveUser) {
+			t.Fatalf("expected ErrInactiveUser, got %v", err)
 		}
 	})
 }
