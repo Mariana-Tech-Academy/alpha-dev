@@ -57,6 +57,39 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w, http.StatusCreated, "account created successfully", user.Profile())
 }
 
+func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+
+	var req service.LoginRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "invalid login JSON")
+		return
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		utils.Error(w, http.StatusBadRequest, "invalid login JSON")
+		return
+	}
+
+	result, err := h.UserService.Login(r.Context(), req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidCredentials):
+			utils.Error(w, http.StatusUnauthorized, "invalid email or password")
+		case errors.Is(err, service.ErrInactiveUser):
+			utils.Error(w, http.StatusForbidden, "account is not active")
+		default:
+			log.Printf("login: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to log in")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "login successful", result)
+}
+
 func (h *UserHandler) Me(w http.ResponseWriter, r *http.Request) {
 	claims, err := auth.ClaimsFromContext(r.Context())
 	if err != nil {

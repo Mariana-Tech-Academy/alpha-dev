@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	ErrEmailTaken   = errors.New("email is already taken")
-	ErrUserNotFound = errors.New("user not found")
-	ErrInactiveUser = errors.New("account is not active")
+	ErrEmailTaken         = errors.New("email is already taken")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInactiveUser       = errors.New("account is not active")
+	ErrInvalidCredentials = errors.New("invalid email or password")
 )
 
 type RegisterRequest struct {
@@ -27,6 +28,16 @@ type RegisterRequest struct {
 	Phone           string `json:"phone"`
 	Password        string `json:"password"`
 	ConfirmPassword string `json:"confirm_password"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResult struct {
+	Token string             `json:"token"`
+	User  models.UserProfile `json:"user"`
 }
 
 type RegistrationValidationError struct {
@@ -39,6 +50,7 @@ func (err *RegistrationValidationError) Error() string {
 
 type UserService interface {
 	Register(ctx context.Context, req RegisterRequest) (*models.User, error)
+	Login(ctx context.Context, req LoginRequest) (*LoginResult, error)
 	GetActiveUser(ctx context.Context, id uint) (models.User, error)
 	Logout(ctx context.Context, claims *auth.Claims) error
 }
@@ -159,6 +171,35 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*model
 	}
 
 	return user, nil
+}
+
+func (s *userService) Login(ctx context.Context, req LoginRequest) (*LoginResult, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if email == "" || req.Password == "" {
+		return nil, ErrInvalidCredentials
+	}
+
+	user, err := s.userRepo.FindByEmail(ctx, email)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrInvalidCredentials
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if !utils.CheckPassword(user.Password, req.Password) {
+		return nil, ErrInvalidCredentials
+	}
+	if user.Status != models.UserStatusActive {
+		return nil, ErrInactiveUser
+	}
+
+	token, err := s.tokens.Generate(user.ID, user.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginResult{Token: token, User: user.Profile()}, nil
 }
 
 func (s *userService) GetActiveUser(ctx context.Context, id uint) (models.User, error) {
