@@ -93,6 +93,12 @@ func (f *fakeUserRepo) FindByEmail(context.Context, string) (models.User, error)
 	return f.found, f.findErr
 }
 
+func (f *fakeUserRepo) UpdatePassword(_ context.Context, id uint, hash string) error {
+	f.found.ID = id
+	f.found.Password = hash
+	return nil
+}
+
 func TestRegister(t *testing.T) {
 	t.Run("creates active customer with hashed password", func(t *testing.T) {
 		repo := &fakeUserRepo{}

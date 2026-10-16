@@ -130,3 +130,49 @@ func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+
+	var req service.ChangePasswordRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "invalid password change JSON")
+		return
+	}
+
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		utils.Error(w, http.StatusBadRequest, "invalid password change JSON")
+		return
+	}
+
+	if err := h.UserService.ChangePassword(r.Context(), claims, req); err != nil {
+		switch {
+		case errors.Is(err, service.ErrIncorrectPassword):
+			utils.Error(w, http.StatusUnauthorized, "incorrect current password")
+		case errors.Is(err, service.ErrPasswordMismatch),
+			errors.Is(err, service.ErrWeakPassword),
+			errors.Is(err, service.ErrPasswordTooLong),
+			errors.Is(err, service.ErrPasswordRequired),
+			errors.Is(err, service.ErrConfirmRequired),
+			errors.Is(err, service.ErrSamePassword):
+			utils.Error(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrUserNotFound):
+			utils.Error(w, http.StatusUnauthorized, "user not found")
+		default:
+			log.Printf("change password for user %d: %v", claims.UserID, err)
+			utils.Error(w, http.StatusInternalServerError, "unable to change password")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "password updated successfully", nil)
+}

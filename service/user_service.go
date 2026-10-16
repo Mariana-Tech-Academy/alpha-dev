@@ -19,6 +19,13 @@ var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInactiveUser       = errors.New("account is not active")
 	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrIncorrectPassword  = errors.New("incorrect current password")
+	ErrPasswordMismatch   = errors.New("passwords do not match")
+	ErrWeakPassword       = errors.New("password must contain at least 8 characters")
+	ErrPasswordTooLong    = errors.New("password must not exceed 72 bytes")
+	ErrSamePassword       = errors.New("new password must be different from the current password")
+	ErrPasswordRequired   = errors.New("password is required")
+	ErrConfirmRequired    = errors.New("confirm password is required")
 )
 
 type RegisterRequest struct {
@@ -40,6 +47,12 @@ type LoginResult struct {
 	User  models.UserProfile `json:"user"`
 }
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
 type RegistrationValidationError struct {
 	Fields map[string]string
 }
@@ -53,6 +66,7 @@ type UserService interface {
 	Login(ctx context.Context, req LoginRequest) (*LoginResult, error)
 	GetActiveUser(ctx context.Context, id uint) (models.User, error)
 	Logout(ctx context.Context, claims *auth.Claims) error
+	ChangePassword(ctx context.Context, claims *auth.Claims, req ChangePasswordRequest) error
 }
 
 type userService struct {
@@ -127,6 +141,25 @@ func validateRegistration(req RegisterRequest) map[string]string {
 	}
 
 	return fields
+}
+
+func validateNewPassword(password, confirm string) error {
+	if password == "" {
+		return ErrPasswordRequired
+	}
+	if len([]rune(password)) < 8 {
+		return ErrWeakPassword
+	}
+	if len(password) > 72 {
+		return ErrPasswordTooLong
+	}
+	if confirm == "" {
+		return ErrConfirmRequired
+	}
+	if password != confirm {
+		return ErrPasswordMismatch
+	}
+	return nil
 }
 
 func (s *userService) Register(ctx context.Context, req RegisterRequest) (*models.User, error) {
@@ -222,5 +255,42 @@ func (s *userService) GetActiveUser(ctx context.Context, id uint) (models.User, 
 }
 
 func (s *userService) Logout(ctx context.Context, claims *auth.Claims) error {
+	return s.tokens.Revoke(ctx, claims)
+}
+
+func (s *userService) ChangePassword(ctx context.Context, claims *auth.Claims, req ChangePasswordRequest) error {
+	if claims == nil || claims.UserID == 0 {
+		return ErrUserNotFound
+	}
+
+	if err := validateNewPassword(req.NewPassword, req.ConfirmPassword); err != nil {
+		return err
+	}
+	if req.NewPassword == req.CurrentPassword {
+		return ErrSamePassword
+	}
+
+	user, err := s.userRepo.FindByID(ctx, claims.UserID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if !utils.CheckPassword(user.Password, req.CurrentPassword) {
+		return ErrIncorrectPassword
+	}
+
+	hash, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	if err := s.userRepo.UpdatePassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+
+	// End this session so the client must log in again with the new password.
 	return s.tokens.Revoke(ctx, claims)
 }
