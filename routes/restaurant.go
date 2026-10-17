@@ -26,8 +26,8 @@ func RestaurantRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) 
 	manager := protected(router, tokens)
 	manager.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
-manager.HandleFunc(
-    "/restaurants",
-    restaurantHandler.RegisterRestaurant,
-).Methods(http.MethodPost)
+	manager.HandleFunc(
+		"/restaurants",
+		restaurantHandler.RegisterRestaurant,
+	).Methods(http.MethodPost)
 }
