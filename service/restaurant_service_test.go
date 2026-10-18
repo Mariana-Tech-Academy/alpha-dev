@@ -19,6 +19,14 @@ func (f *fakeRestaurantRepo) Create(_ context.Context, restaurant *models.Restau
 	return f.err
 }
 
+func (f *fakeRestaurantRepo) FindByID(context.Context, uint) (models.Restaurant, error) {
+	return models.Restaurant{}, nil
+}
+
+func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, models.RestaurantStatus, models.RestaurantStatus) (bool, error) {
+	return false, nil
+}
+
 func validRestaurant() *models.Restaurant {
 	return &models.Restaurant{
 		ManagerID:   4,

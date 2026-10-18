@@ -10,6 +10,14 @@ import (
 
 type RestaurantRepository interface {
 	Create(ctx context.Context, restaurant *models.Restaurant) error
+	FindByID(ctx context.Context, id uint) (models.Restaurant, error)
+	UpdateAvailability(
+		ctx context.Context,
+		id uint,
+		managerID uint,
+		currentStatus models.RestaurantStatus,
+		nextStatus models.RestaurantStatus,
+	) (bool, error)
 }
 
 type PostgresRestaurantRepo struct {
@@ -20,9 +28,32 @@ func NewRestaurantRepository(db *gorm.DB) RestaurantRepository {
 	return &PostgresRestaurantRepo{db: db}
 }
 
-func (r *PostgresRestaurantRepo) Create(
+func (repo *PostgresRestaurantRepo) Create(ctx context.Context, restaurant *models.Restaurant) error {
+	return repo.db.WithContext(ctx).Create(restaurant).Error
+}
+
+func (repo *PostgresRestaurantRepo) FindByID(ctx context.Context, id uint) (models.Restaurant, error) {
+	var restaurant models.Restaurant
+	err := repo.db.WithContext(ctx).First(&restaurant, id).Error
+	return restaurant, err
+}
+
+// UpdateAvailability changes status only if the owner and previous status still match.
+func (repo *PostgresRestaurantRepo) UpdateAvailability(
 	ctx context.Context,
-	restaurant *models.Restaurant,
-) error {
-	return r.db.WithContext(ctx).Create(restaurant).Error
+	id uint,
+	managerID uint,
+	currentStatus models.RestaurantStatus,
+	nextStatus models.RestaurantStatus,
+) (bool, error) {
+	result := repo.db.WithContext(ctx).
+		Model(&models.Restaurant{}).
+		Where("id = ? AND manager_id = ? AND status = ?", id, managerID, currentStatus).
+		Where("status IN ?", []models.RestaurantStatus{
+			models.RestaurantStatusActive,
+			models.RestaurantStatusInactive,
+		}).
+		Update("status", nextStatus)
+
+	return result.RowsAffected == 1, result.Error
 }
