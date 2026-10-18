@@ -7,6 +7,7 @@ import (
 	"alpha-dev/models"
 	"alpha-dev/repository"
 	"alpha-dev/service"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -24,5 +25,5 @@ func MenuRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	manager := protected(router, tokens)
 	manager.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
-	_, _ = menuHandler, manager
+	manager.HandleFunc("/menu", menuHandler.CreateMenuItem).Methods(http.MethodPost)
 }
