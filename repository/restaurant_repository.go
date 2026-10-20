@@ -1,8 +1,15 @@
 package repository
 
-import "gorm.io/gorm"
+import (
+	"context"
+
+	"alpha-dev/models"
+
+	"gorm.io/gorm"
+)
 
 type RestaurantRepository interface {
+	Create(ctx context.Context, restaurant *models.Restaurant) error
 }
 
 type PostgresRestaurantRepo struct {
@@ -11,4 +18,11 @@ type PostgresRestaurantRepo struct {
 
 func NewRestaurantRepository(db *gorm.DB) RestaurantRepository {
 	return &PostgresRestaurantRepo{db: db}
+}
+
+func (r *PostgresRestaurantRepo) Create(
+	ctx context.Context,
+	restaurant *models.Restaurant,
+) error {
+	return r.db.WithContext(ctx).Create(restaurant).Error
 }

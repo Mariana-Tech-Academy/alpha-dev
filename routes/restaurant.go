@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"alpha-dev/auth"
 	"alpha-dev/handlers"
 	"alpha-dev/middleware"
@@ -24,5 +26,8 @@ func RestaurantRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) 
 	manager := protected(router, tokens)
 	manager.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
-	_, _ = restaurantHandler, manager
+	manager.HandleFunc(
+		"/restaurants",
+		restaurantHandler.RegisterRestaurant,
+	).Methods(http.MethodPost)
 }
