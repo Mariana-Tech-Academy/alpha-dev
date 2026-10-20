@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 bin/
+*.exe
 *.test
 coverage.out
 .DS_Store
