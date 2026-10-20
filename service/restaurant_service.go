@@ -3,7 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"mime/multipart"
 	"net/mail"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,7 +23,12 @@ var (
 	ErrRestaurantInvalidStatus = errors.New("status must be active or inactive")
 	ErrRestaurantRestricted    = errors.New("restaurant requires admin action")
 	ErrRestaurantChanged       = errors.New("restaurant changed; refresh and try again")
+	ErrInvalidImage            = errors.New("invalid image")
 )
+
+var allowedImageExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+
+const maxImageSize = 5 * 1024 * 1024
 
 // RestaurantValidationError holds field-level validation errors.
 type RestaurantValidationError struct {
@@ -40,6 +48,7 @@ type RestaurantService interface {
 		restaurantID uint,
 		nextStatus models.RestaurantStatus,
 	) error
+	UpdateRestaurant(ctx context.Context, id uint, userID uint, role models.Role, input *models.UpdateRestaurantInput, file *multipart.FileHeader) (*models.Restaurant, error)
 }
 
 type restaurantService struct {
@@ -175,4 +184,72 @@ func (s *restaurantService) SetAvailability(
 	}
 
 	return nil
+}
+
+func (s *restaurantService) UpdateRestaurant(ctx context.Context, id uint, userID uint, role models.Role, input *models.UpdateRestaurantInput, file *multipart.FileHeader) (*models.Restaurant, error) {
+	restaurant, err := s.restaurantRepo.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRestaurantNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if role == models.RoleCustomer {
+		return nil, fmt.Errorf("%w: customers cannot update restaurant", ErrRestaurantForbidden)
+	}
+	if role == models.RoleManager && restaurant.ManagerID != userID {
+		return nil, fmt.Errorf("%w: you do not manage this restaurant", ErrRestaurantForbidden)
+	}
+
+	if file != nil {
+		if file.Size > maxImageSize {
+			return nil, fmt.Errorf("%w: image is too large, max allowed is 5MB", ErrInvalidImage)
+		}
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		if !allowedImageExt[ext] {
+			return nil, fmt.Errorf("%w: only .jpg, .jpeg, .png, .webp are allowed", ErrInvalidImage)
+		}
+		restaurant.ImageURL = "/uploads/" + file.Filename
+	}
+	if input.ImageURL != nil && *input.ImageURL != "" && file == nil {
+		ext := strings.ToLower(filepath.Ext(*input.ImageURL))
+		if !allowedImageExt[ext] {
+			return nil, fmt.Errorf("%w: only .jpg, .jpeg, .png, .webp are allowed", ErrInvalidImage)
+		}
+		restaurant.ImageURL = *input.ImageURL
+	}
+
+	if input.Name != nil {
+		restaurant.Name = *input.Name
+	}
+	if input.Description != nil {
+		restaurant.Description = *input.Description
+	}
+	if input.Address != nil {
+		restaurant.Address = *input.Address
+	}
+	if input.City != nil {
+		restaurant.City = *input.City
+	}
+	if input.State != nil {
+		restaurant.State = *input.State
+	}
+	if input.Phone != nil {
+		restaurant.Phone = *input.Phone
+	}
+	if input.Email != nil {
+		restaurant.Email = *input.Email
+	}
+	if input.OpeningTime != nil {
+		restaurant.OpeningTime = *input.OpeningTime
+	}
+	if input.ClosingTime != nil {
+		restaurant.ClosingTime = *input.ClosingTime
+	}
+
+	if err := s.restaurantRepo.Update(ctx, &restaurant); err != nil {
+		return nil, fmt.Errorf("failed to update: %w", err)
+	}
+	return &restaurant, nil
 }

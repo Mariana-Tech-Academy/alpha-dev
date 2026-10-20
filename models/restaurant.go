@@ -63,3 +63,16 @@ func (r *Restaurant) Profile() RestaurantProfile {
 		Status:      r.Status,
 	}
 }
+
+type UpdateRestaurantInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Address     *string `json:"address"`
+	City        *string `json:"city"`
+	State       *string `json:"state"`
+	Phone       *string `json:"phone"`
+	Email       *string `json:"email"`
+	OpeningTime *string `json:"opening_time"`
+	ClosingTime *string `json:"closing_time"`
+	ImageURL    *string `json:"image_url"`
+}

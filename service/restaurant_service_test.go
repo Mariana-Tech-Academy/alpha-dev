@@ -27,6 +27,10 @@ func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, mod
 	return false, nil
 }
 
+func (f *fakeRestaurantRepo) Update(context.Context, *models.Restaurant) error {
+	return nil
+}
+
 func validRestaurant() *models.Restaurant {
 	return &models.Restaurant{
 		ManagerID:   4,

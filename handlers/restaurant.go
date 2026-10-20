@@ -5,8 +5,10 @@ import (
 	"errors"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"alpha-dev/auth"
 	"alpha-dev/models"
@@ -149,4 +151,87 @@ func (h *RestaurantHandler) SetAvailability(w http.ResponseWriter, r *http.Reque
 		"id":     uint(id),
 		"status": req.Status,
 	})
+}
+
+func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.ParseUint(vars["id"], 10, 64)
+	if err != nil || id == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant id")
+		return
+	}
+
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	var input models.UpdateRestaurantInput
+	var file *multipart.FileHeader
+
+	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm(10 * 1024 * 1024); err != nil {
+			utils.Error(w, http.StatusBadRequest, "invalid form data")
+			return
+		}
+
+		if nameVal := r.FormValue("name"); nameVal != "" {
+			input.Name = &nameVal
+		}
+		if descVal := r.FormValue("description"); descVal != "" {
+			input.Description = &descVal
+		}
+		if addressVal := r.FormValue("address"); addressVal != "" {
+			input.Address = &addressVal
+		}
+		if cityVal := r.FormValue("city"); cityVal != "" {
+			input.City = &cityVal
+		}
+		if stateVal := r.FormValue("state"); stateVal != "" {
+			input.State = &stateVal
+		}
+		if phoneVal := r.FormValue("phone"); phoneVal != "" {
+			input.Phone = &phoneVal
+		}
+		if emailVal := r.FormValue("email"); emailVal != "" {
+			input.Email = &emailVal
+		}
+		if openVal := r.FormValue("opening_time"); openVal != "" {
+			input.OpeningTime = &openVal
+		}
+		if closeVal := r.FormValue("closing_time"); closeVal != "" {
+			input.ClosingTime = &closeVal
+		}
+		if imageURLVal := r.FormValue("image_url"); imageURLVal != "" {
+			input.ImageURL = &imageURLVal
+		}
+		if _, fileHeader, err := r.FormFile("image"); err == nil {
+			file = fileHeader
+		}
+	} else {
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&input); err != nil {
+			utils.Error(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+	}
+
+	updated, err := h.RestaurantService.UpdateRestaurant(r.Context(), uint(id), claims.UserID, claims.Role, &input, file)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrRestaurantNotFound):
+			utils.Error(w, http.StatusNotFound, "restaurant not found")
+		case errors.Is(err, service.ErrRestaurantForbidden):
+			utils.Error(w, http.StatusForbidden, err.Error())
+		case errors.Is(err, service.ErrInvalidImage):
+			utils.Error(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("update restaurant %d: %v", id, err)
+			utils.Error(w, http.StatusInternalServerError, "failed to update")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurant updated", updated.Profile())
 }
