@@ -9,9 +9,18 @@ import (
 
 	"alpha-dev/models"
 	"alpha-dev/repository"
+
+	"gorm.io/gorm"
 )
 
-var ErrMissingManager = errors.New("authenticated manager ID is missing")
+var (
+	ErrMissingManager          = errors.New("authenticated manager ID is missing")
+	ErrRestaurantNotFound      = errors.New("restaurant not found")
+	ErrRestaurantForbidden     = errors.New("you cannot manage this restaurant")
+	ErrRestaurantInvalidStatus = errors.New("status must be active or inactive")
+	ErrRestaurantRestricted    = errors.New("restaurant requires admin action")
+	ErrRestaurantChanged       = errors.New("restaurant changed; refresh and try again")
+)
 
 // RestaurantValidationError holds field-level validation errors.
 type RestaurantValidationError struct {
@@ -22,17 +31,21 @@ func (e *RestaurantValidationError) Error() string {
 	return "restaurant validation failed"
 }
 
-// RestaurantService defines restaurant operations.
 type RestaurantService interface {
 	RegisterRestaurant(ctx context.Context, restaurant *models.Restaurant) error
+	SetAvailability(
+		ctx context.Context,
+		userID uint,
+		role models.Role,
+		restaurantID uint,
+		nextStatus models.RestaurantStatus,
+	) error
 }
 
-// restaurantService contains the restaurant repository.
 type restaurantService struct {
 	restaurantRepo repository.RestaurantRepository
 }
 
-// NewRestaurantService creates a restaurant service.
 func NewRestaurantService(repo repository.RestaurantRepository) RestaurantService {
 	return &restaurantService{restaurantRepo: repo}
 }
@@ -120,4 +133,46 @@ func (s *restaurantService) RegisterRestaurant(ctx context.Context, restaurant *
 
 	restaurant.Status = models.RestaurantStatusPending
 	return s.restaurantRepo.Create(ctx, restaurant)
+}
+
+func (s *restaurantService) SetAvailability(
+	ctx context.Context,
+	userID uint,
+	role models.Role,
+	restaurantID uint,
+	nextStatus models.RestaurantStatus,
+) error {
+	if userID == 0 || role != models.RoleManager {
+		return ErrRestaurantForbidden
+	}
+
+	if nextStatus != models.RestaurantStatusActive && nextStatus != models.RestaurantStatusInactive {
+		return ErrRestaurantInvalidStatus
+	}
+
+	restaurant, err := s.restaurantRepo.FindByID(ctx, restaurantID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrRestaurantNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if restaurant.ManagerID != userID {
+		return ErrRestaurantForbidden
+	}
+
+	if restaurant.Status != models.RestaurantStatusActive && restaurant.Status != models.RestaurantStatusInactive {
+		return ErrRestaurantRestricted
+	}
+
+	updated, err := s.restaurantRepo.UpdateAvailability(ctx, restaurantID, userID, restaurant.Status, nextStatus)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return ErrRestaurantChanged
+	}
+
+	return nil
 }
