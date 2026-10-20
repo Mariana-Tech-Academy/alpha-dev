@@ -7,6 +7,7 @@ import (
 	"alpha-dev/models"
 	"alpha-dev/repository"
 	"alpha-dev/service"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -22,7 +23,7 @@ func MenuRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	// manager routes: POST /menu, PUT /menu/{id}, DELETE /menu/{id}
 	// The service must also check the item belongs to the calling manager's restaurant.
 	manager := protected(router, tokens)
-	manager.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
+	manager.Use(middleware.RequireRole(models.RoleManager))
 
-	_, _ = menuHandler, manager
+	manager.HandleFunc("/menu", menuHandler.CreateMenuItem).Methods(http.MethodPost)
 }
