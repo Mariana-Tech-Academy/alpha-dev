@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	"alpha-dev/utils"
-	"errors"
-	"log"
-
 	"encoding/json"
+	"errors"
+	"io"
+	"log"
 	"net/http"
 
 	"alpha-dev/auth"
 	"alpha-dev/models"
 	"alpha-dev/service"
+	"alpha-dev/utils"
 )
 
 type RestaurantHandler struct {
@@ -25,32 +25,32 @@ type RegisterRestaurantRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Address     string `json:"address"`
+	City        string `json:"city"`
+	State       string `json:"state"`
 	Phone       string `json:"phone"`
 	Email       string `json:"email"`
 	OpeningTime string `json:"opening_time"`
 	ClosingTime string `json:"closing_time"`
 }
 
-func (h *RestaurantHandler) RegisterRestaurant(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
+func (h *RestaurantHandler) RegisterRestaurant(w http.ResponseWriter, r *http.Request) {
 	claims, err := auth.ClaimsFromContext(r.Context())
 	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
 
-	if claims.Role != models.RoleManager &&
-		claims.Role != models.RoleAdmin {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
 
 	var req RegisterRestaurantRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant JSON")
+		return
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant JSON")
 		return
 	}
 
@@ -59,40 +59,27 @@ func (h *RestaurantHandler) RegisterRestaurant(
 		Name:        req.Name,
 		Description: req.Description,
 		Address:     req.Address,
+		City:        req.City,
+		State:       req.State,
 		Phone:       req.Phone,
 		Email:       req.Email,
 		OpeningTime: req.OpeningTime,
 		ClosingTime: req.ClosingTime,
 	}
 
-	if err := h.RestaurantService.RegisterRestaurant(
-		r.Context(), restaurant,
-	); err != nil {
+	if err := h.RestaurantService.RegisterRestaurant(r.Context(), restaurant); err != nil {
 		var validationErr *service.RestaurantValidationError
-
-		if errors.As(err, &validationErr) {
-			utils.ValidationError(
-				w,
-				"Please correct the restaurant details",
-				validationErr.Fields,
-			)
-			return
+		switch {
+		case errors.As(err, &validationErr):
+			utils.ValidationError(w, "check the restaurant details", validationErr.Fields)
+		case errors.Is(err, service.ErrMissingManager):
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		default:
+			log.Printf("restaurant registration failed: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to register restaurant")
 		}
-
-		log.Printf("restaurant registration failed: %v", err)
-
-		utils.Error(
-			w,
-			http.StatusInternalServerError,
-			"Unable to register restaurant",
-		)
 		return
 	}
 
-	utils.Success(
-		w,
-		http.StatusCreated,
-		"Restaurant registered successfully",
-		restaurant,
-	)
+	utils.Success(w, http.StatusCreated, "restaurant registered successfully", restaurant.Profile())
 }
