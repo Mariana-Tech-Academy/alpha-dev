@@ -15,7 +15,6 @@ var (
 	ErrNameRequired         = errors.New("name is required")
 	ErrInvalidPrice         = errors.New("price must be greater than zero")
 	ErrRestaurantIDRequired = errors.New("restaurant_id is required")
-	ErrRestaurantNotFound   = errors.New("restaurant not found")
 	ErrNotYourRestaurant    = errors.New("you do not manage this restaurant")
 	ErrRestaurantClosed     = errors.New("restaurant cannot accept menu items")
 	ErrCategoryIDRequired   = errors.New("category_id is required")
