@@ -62,7 +62,6 @@ func (repo *PostgresUserRepo) UpdatePassword(ctx context.Context, id uint, hash 
 		Update("password", hash).Error
 }
 
-
 func (repo *PostgresUserRepo) Update(ctx context.Context, user *models.User) error {
-    return repo.db.WithContext(ctx).Save(user).Error
+	return repo.db.WithContext(ctx).Save(user).Error
 }

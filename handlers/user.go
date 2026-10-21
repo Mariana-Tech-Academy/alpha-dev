@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"alpha-dev/auth"
+	"alpha-dev/models"
 	"alpha-dev/service"
 	"alpha-dev/utils"
-	"alpha-dev/models"
 )
 
 type UserHandler struct {
@@ -178,39 +178,37 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w, http.StatusOK, "password updated successfully", nil)
 }
 
-
-
 func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
-    r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
 
-    var req models.ProfileUpdate
-    decoder := json.NewDecoder(r.Body)
-    decoder.DisallowUnknownFields()
+	var req models.ProfileUpdate
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 
-    if err := decoder.Decode(&req); err != nil {
-        utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
-        return
-    }
+	if err := decoder.Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
+		return
+	}
 
-    if err := decoder.Decode(new(any)); err != io.EOF {
-        utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
-        return
-    }
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
+		return
+	}
 
-    claims, ok := r.Context().Value("claims").(*auth.Claims) 
-    if !ok {
-        utils.Error(w, http.StatusUnauthorized, "unauthorized")
-        return
-    }
+	claims, ok := r.Context().Value("claims").(*auth.Claims)
+	if !ok {
+		utils.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 
-    err := h.UserService.UpdateUserProfile(r.Context(), claims.UserID, req)
-    if err != nil {
-        switch {
-        default:
-            log.Printf("update user profile error: %v", err)
-            utils.Error(w, http.StatusInternalServerError, "Unable to update profile")
-        }
-        return
-    }
-    w.WriteHeader(http.StatusOK)
+	err := h.UserService.UpdateUserProfile(r.Context(), claims.UserID, req)
+	if err != nil {
+		switch {
+		default:
+			log.Printf("update user profile error: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "Unable to update profile")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

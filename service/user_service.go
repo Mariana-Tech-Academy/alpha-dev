@@ -296,17 +296,14 @@ func (s *userService) ChangePassword(ctx context.Context, claims *auth.Claims, r
 	return s.tokens.Revoke(ctx, claims)
 }
 
-
-
 func (s *userService) UpdateUserProfile(ctx context.Context, userID uint, input models.ProfileUpdate) error {
-    user, err := s.userRepo.FindByID(ctx, userID) 
-    if err != nil {
-        return err
-    }
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
 
-    if err := user.UpdateProfile(input); err != nil {
-        return err
-    }
-    return s.userRepo.Update(ctx, &user)
+	if err := user.UpdateProfile(input); err != nil {
+		return err
+	}
+	return s.userRepo.Update(ctx, &user)
 }
-
