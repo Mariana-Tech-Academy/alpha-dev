@@ -28,8 +28,6 @@ var (
 
 var allowedImageExt = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
 
-const maxImageSize = 5 * 1024 * 1024
-
 // RestaurantValidationError holds field-level validation errors.
 type RestaurantValidationError struct {
 	Fields map[string]string
@@ -201,54 +199,101 @@ func (s *restaurantService) UpdateRestaurant(ctx context.Context, id uint, userI
 	if role == models.RoleManager && restaurant.ManagerID != userID {
 		return nil, fmt.Errorf("%w: you do not manage this restaurant", ErrRestaurantForbidden)
 	}
-
 	if file != nil {
-		if file.Size > maxImageSize {
-			return nil, fmt.Errorf("%w: image is too large, max allowed is 5MB", ErrInvalidImage)
-		}
-		ext := strings.ToLower(filepath.Ext(file.Filename))
-		if !allowedImageExt[ext] {
-			return nil, fmt.Errorf("%w: only .jpg, .jpeg, .png, .webp are allowed", ErrInvalidImage)
-		}
-		restaurant.ImageURL = "/uploads/" + file.Filename
+		return nil, fmt.Errorf("%w: image upload is not supported; send image_url", ErrInvalidImage)
 	}
-	if input.ImageURL != nil && *input.ImageURL != "" && file == nil {
-		ext := strings.ToLower(filepath.Ext(*input.ImageURL))
-		if !allowedImageExt[ext] {
-			return nil, fmt.Errorf("%w: only .jpg, .jpeg, .png, .webp are allowed", ErrInvalidImage)
-		}
-		restaurant.ImageURL = *input.ImageURL
-	}
+
+	fields := make(map[string]string)
+	updates := make(map[string]any)
 
 	if input.Name != nil {
-		restaurant.Name = *input.Name
+		restaurant.Name = strings.TrimSpace(*input.Name)
+		if restaurant.Name == "" {
+			fields["name"] = "restaurant name is required"
+		} else {
+			updates["name"] = restaurant.Name
+		}
 	}
 	if input.Description != nil {
-		restaurant.Description = *input.Description
+		restaurant.Description = strings.TrimSpace(*input.Description)
+		updates["description"] = restaurant.Description
 	}
 	if input.Address != nil {
-		restaurant.Address = *input.Address
+		restaurant.Address = strings.TrimSpace(*input.Address)
+		if restaurant.Address == "" {
+			fields["address"] = "address is required"
+		} else {
+			updates["address"] = restaurant.Address
+		}
 	}
 	if input.City != nil {
-		restaurant.City = *input.City
+		restaurant.City = strings.TrimSpace(*input.City)
+		updates["city"] = restaurant.City
 	}
 	if input.State != nil {
-		restaurant.State = *input.State
+		restaurant.State = strings.TrimSpace(*input.State)
+		updates["state"] = restaurant.State
 	}
 	if input.Phone != nil {
-		restaurant.Phone = *input.Phone
+		restaurant.Phone = strings.TrimSpace(*input.Phone)
+		if restaurant.Phone == "" {
+			fields["phone"] = "phone number is required"
+		} else if !validRestaurantPhone(restaurant.Phone) {
+			fields["phone"] = "enter a valid phone number"
+		} else {
+			updates["phone"] = restaurant.Phone
+		}
 	}
 	if input.Email != nil {
-		restaurant.Email = *input.Email
+		restaurant.Email = strings.ToLower(strings.TrimSpace(*input.Email))
+		parsed, err := mail.ParseAddress(restaurant.Email)
+		if restaurant.Email == "" || err != nil || parsed.Address != restaurant.Email {
+			fields["email"] = "invalid email address"
+		} else {
+			updates["email"] = restaurant.Email
+		}
 	}
 	if input.OpeningTime != nil {
-		restaurant.OpeningTime = *input.OpeningTime
+		restaurant.OpeningTime = strings.TrimSpace(*input.OpeningTime)
 	}
 	if input.ClosingTime != nil {
-		restaurant.ClosingTime = *input.ClosingTime
+		restaurant.ClosingTime = strings.TrimSpace(*input.ClosingTime)
+	}
+	if input.OpeningTime != nil || input.ClosingTime != nil {
+		opening, openingErr := time.Parse("15:04", restaurant.OpeningTime)
+		closing, closingErr := time.Parse("15:04", restaurant.ClosingTime)
+		if input.OpeningTime != nil && (restaurant.OpeningTime == "" || openingErr != nil) {
+			fields["opening_time"] = "opening time must be HH:MM"
+		}
+		if input.ClosingTime != nil && (restaurant.ClosingTime == "" || closingErr != nil) {
+			fields["closing_time"] = "closing time must be HH:MM"
+		}
+		if openingErr == nil && closingErr == nil && !closing.After(opening) {
+			fields["closing_time"] = "closing time must be after opening time"
+		}
+		if _, bad := fields["opening_time"]; !bad && input.OpeningTime != nil {
+			updates["opening_time"] = restaurant.OpeningTime
+		}
+		if _, bad := fields["closing_time"]; !bad && input.ClosingTime != nil {
+			updates["closing_time"] = restaurant.ClosingTime
+		}
+	}
+	if input.ImageURL != nil {
+		restaurant.ImageURL = strings.TrimSpace(*input.ImageURL)
+		if restaurant.ImageURL != "" && !allowedImageExt[strings.ToLower(filepath.Ext(restaurant.ImageURL))] {
+			fields["image_url"] = "only .jpg, .jpeg, .png, .webp are allowed"
+		} else {
+			updates["image_url"] = restaurant.ImageURL
+		}
 	}
 
-	if err := s.restaurantRepo.Update(ctx, &restaurant); err != nil {
+	if len(fields) > 0 {
+		return nil, &RestaurantValidationError{Fields: fields}
+	}
+	if len(updates) == 0 {
+		return &restaurant, nil
+	}
+	if err := s.restaurantRepo.UpdateFields(ctx, id, updates); err != nil {
 		return nil, fmt.Errorf("failed to update: %w", err)
 	}
 	return &restaurant, nil

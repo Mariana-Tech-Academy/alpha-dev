@@ -171,46 +171,27 @@ func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Requ
 	var file *multipart.FileHeader
 
 	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if err := r.ParseMultipartForm(10 * 1024 * 1024); err != nil {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
 			utils.Error(w, http.StatusBadRequest, "invalid form data")
 			return
 		}
-
-		if nameVal := r.FormValue("name"); nameVal != "" {
-			input.Name = &nameVal
-		}
-		if descVal := r.FormValue("description"); descVal != "" {
-			input.Description = &descVal
-		}
-		if addressVal := r.FormValue("address"); addressVal != "" {
-			input.Address = &addressVal
-		}
-		if cityVal := r.FormValue("city"); cityVal != "" {
-			input.City = &cityVal
-		}
-		if stateVal := r.FormValue("state"); stateVal != "" {
-			input.State = &stateVal
-		}
-		if phoneVal := r.FormValue("phone"); phoneVal != "" {
-			input.Phone = &phoneVal
-		}
-		if emailVal := r.FormValue("email"); emailVal != "" {
-			input.Email = &emailVal
-		}
-		if openVal := r.FormValue("opening_time"); openVal != "" {
-			input.OpeningTime = &openVal
-		}
-		if closeVal := r.FormValue("closing_time"); closeVal != "" {
-			input.ClosingTime = &closeVal
-		}
-		if imageURLVal := r.FormValue("image_url"); imageURLVal != "" {
-			input.ImageURL = &imageURLVal
-		}
+		input.Name = formField(r, "name")
+		input.Description = formField(r, "description")
+		input.Address = formField(r, "address")
+		input.City = formField(r, "city")
+		input.State = formField(r, "state")
+		input.Phone = formField(r, "phone")
+		input.Email = formField(r, "email")
+		input.OpeningTime = formField(r, "opening_time")
+		input.ClosingTime = formField(r, "closing_time")
+		input.ImageURL = formField(r, "image_url")
 		if _, fileHeader, err := r.FormFile("image"); err == nil {
 			file = fileHeader
 		}
 	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
 		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&input); err != nil {
 			utils.Error(w, http.StatusBadRequest, "invalid JSON")
 			return
@@ -219,7 +200,10 @@ func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Requ
 
 	updated, err := h.RestaurantService.UpdateRestaurant(r.Context(), uint(id), claims.UserID, claims.Role, &input, file)
 	if err != nil {
+		var validationErr *service.RestaurantValidationError
 		switch {
+		case errors.As(err, &validationErr):
+			utils.ValidationError(w, "check the restaurant details", validationErr.Fields)
 		case errors.Is(err, service.ErrRestaurantNotFound):
 			utils.Error(w, http.StatusNotFound, "restaurant not found")
 		case errors.Is(err, service.ErrRestaurantForbidden):
@@ -234,4 +218,17 @@ func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Requ
 	}
 
 	utils.Success(w, http.StatusOK, "restaurant updated", updated.Profile())
+}
+
+// formField returns the value when the multipart form included the key, including a blank value.
+func formField(r *http.Request, key string) *string {
+	if r.MultipartForm == nil {
+		return nil
+	}
+	values, ok := r.MultipartForm.Value[key]
+	if !ok || len(values) == 0 {
+		return nil
+	}
+	value := values[0]
+	return &value
 }

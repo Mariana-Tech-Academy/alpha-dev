@@ -44,6 +44,7 @@ type RestaurantProfile struct {
 	Email       string           `json:"email"`
 	OpeningTime string           `json:"opening_time"`
 	ClosingTime string           `json:"closing_time"`
+	ImageURL    string           `json:"image_url,omitempty"`
 	Status      RestaurantStatus `json:"status"`
 }
 
@@ -60,6 +61,7 @@ func (r *Restaurant) Profile() RestaurantProfile {
 		Email:       r.Email,
 		OpeningTime: r.OpeningTime,
 		ClosingTime: r.ClosingTime,
+		ImageURL:    r.ImageURL,
 		Status:      r.Status,
 	}
 }

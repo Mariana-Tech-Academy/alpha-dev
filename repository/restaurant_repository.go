@@ -11,7 +11,7 @@ import (
 type RestaurantRepository interface {
 	Create(ctx context.Context, restaurant *models.Restaurant) error
 	FindByID(ctx context.Context, id uint) (models.Restaurant, error)
-	Update(ctx context.Context, restaurant *models.Restaurant) error
+	UpdateFields(ctx context.Context, id uint, fields map[string]any) error
 	UpdateAvailability(
 		ctx context.Context,
 		id uint,
@@ -39,8 +39,11 @@ func (repo *PostgresRestaurantRepo) FindByID(ctx context.Context, id uint) (mode
 	return restaurant, err
 }
 
-func (repo *PostgresRestaurantRepo) Update(ctx context.Context, restaurant *models.Restaurant) error {
-	return repo.db.WithContext(ctx).Save(restaurant).Error
+func (repo *PostgresRestaurantRepo) UpdateFields(ctx context.Context, id uint, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return repo.db.WithContext(ctx).Model(&models.Restaurant{}).Where("id = ?", id).Updates(fields).Error
 }
 
 // UpdateAvailability changes status only if the owner and previous status still match.
