@@ -53,6 +53,21 @@ type ChangePasswordRequest struct {
 	ConfirmPassword string `json:"confirm_password"`
 }
 
+type UpdateProfileRequest struct {
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Email     string `json:"email"`
+	Phone     string `json:"phone"`
+}
+
+type ProfileValidationError struct {
+	Fields map[string]string
+}
+
+func (err *ProfileValidationError) Error() string {
+	return "invalid profile fields"
+}
+
 type RegistrationValidationError struct {
 	Fields map[string]string
 }
@@ -67,6 +82,7 @@ type UserService interface {
 	GetActiveUser(ctx context.Context, id uint) (models.User, error)
 	Logout(ctx context.Context, claims *auth.Claims) error
 	ChangePassword(ctx context.Context, claims *auth.Claims, req ChangePasswordRequest) error
+	UpdateUserProfile(ctx context.Context, userID uint, input UpdateProfileRequest) (*models.User, error)
 }
 
 type userService struct {
@@ -293,4 +309,83 @@ func (s *userService) ChangePassword(ctx context.Context, claims *auth.Claims, r
 
 	// End this session so the client must log in again with the new password.
 	return s.tokens.Revoke(ctx, claims)
+}
+
+func validateProfile(req UpdateProfileRequest) map[string]string {
+	fields := make(map[string]string)
+
+	if req.FirstName == "" {
+		fields["first_name"] = "First name is required"
+	} else if len([]rune(req.FirstName)) > 100 {
+		fields["first_name"] = "First name must not exceed 100 characters"
+	}
+	if req.LastName == "" {
+		fields["last_name"] = "Last name is required"
+	} else if len([]rune(req.LastName)) > 100 {
+		fields["last_name"] = "Last name must not exceed 100 characters"
+	}
+	if req.Phone == "" {
+		fields["phone"] = "Phone number is required"
+	} else if len([]rune(req.Phone)) > 30 {
+		fields["phone"] = "Phone number must not exceed 30 characters"
+	} else if !validPhone(req.Phone) {
+		fields["phone"] = "Enter a valid phone number"
+	}
+	if req.Email == "" {
+		fields["email"] = "Email is required"
+	} else {
+		address, err := mail.ParseAddress(req.Email)
+		if err != nil || address.Address != req.Email || len(req.Email) > 254 {
+			fields["email"] = "Enter a valid email address"
+		}
+	}
+	return fields
+}
+
+func (s *userService) UpdateUserProfile(ctx context.Context, userID uint, input UpdateProfileRequest) (*models.User, error) {
+	if userID == 0 {
+		return nil, ErrUserNotFound
+	}
+
+	input.FirstName = strings.TrimSpace(input.FirstName)
+	input.LastName = strings.TrimSpace(input.LastName)
+	input.Phone = strings.TrimSpace(input.Phone)
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	if fields := validateProfile(input); len(fields) > 0 {
+		return nil, &ProfileValidationError{Fields: fields}
+	}
+
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if user.Status != models.UserStatusActive {
+		return nil, ErrInactiveUser
+	}
+
+	if input.Email != user.Email {
+		taken, err := s.userRepo.EmailExists(ctx, input.Email)
+		if err != nil {
+			return nil, err
+		}
+		if taken {
+			return nil, ErrEmailTaken
+		}
+	}
+
+	if err := s.userRepo.UpdateProfile(ctx, user.ID, input.FirstName, input.LastName, input.Email, input.Phone); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrEmailTaken
+		}
+		return nil, err
+	}
+
+	user.FirstName = input.FirstName
+	user.LastName = input.LastName
+	user.Email = input.Email
+	user.Phone = input.Phone
+	return &user, nil
 }
