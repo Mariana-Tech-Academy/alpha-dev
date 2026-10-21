@@ -59,21 +59,3 @@ func (u *User) Profile() UserProfile {
 		CreatedAt: u.CreatedAt,
 	}
 }
-
-type ProfileUpdate struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Phone     string `json:"phone"`
-}
-
-func (u *User) UpdateProfile(input ProfileUpdate) error {
-	u.FirstName = input.FirstName
-	u.LastName = input.LastName
-	u.Phone = input.Phone
-
-	if input.Email != "" && input.Email != u.Email {
-		u.Email = input.Email
-	}
-	return nil
-}

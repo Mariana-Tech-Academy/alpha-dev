@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"alpha-dev/auth"
-	"alpha-dev/models"
 	"alpha-dev/service"
 	"alpha-dev/utils"
 )
@@ -179,36 +178,44 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
 
-	var req models.ProfileUpdate
+	var req service.UpdateProfileRequest
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-
 	if err := decoder.Decode(&req); err != nil {
 		utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
 		return
 	}
-
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		utils.Error(w, http.StatusBadRequest, "invalid profile update JSON")
 		return
 	}
 
-	claims, ok := r.Context().Value("claims").(*auth.Claims)
-	if !ok {
-		utils.Error(w, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
-	err := h.UserService.UpdateUserProfile(r.Context(), claims.UserID, req)
+	user, err := h.UserService.UpdateUserProfile(r.Context(), claims.UserID, req)
 	if err != nil {
+		var validationErr *service.ProfileValidationError
 		switch {
+		case errors.As(err, &validationErr):
+			utils.ValidationError(w, "check the profile fields", validationErr.Fields)
+		case errors.Is(err, service.ErrEmailTaken):
+			utils.Error(w, http.StatusConflict, "email is already taken")
+		case errors.Is(err, service.ErrUserNotFound):
+			utils.Error(w, http.StatusUnauthorized, "user not found")
+		case errors.Is(err, service.ErrInactiveUser):
+			utils.Error(w, http.StatusForbidden, "account is not active")
 		default:
-			log.Printf("update user profile error: %v", err)
-			utils.Error(w, http.StatusInternalServerError, "Unable to update profile")
+			log.Printf("update user profile %d: %v", claims.UserID, err)
+			utils.Error(w, http.StatusInternalServerError, "unable to update profile")
 		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
+	utils.Success(w, http.StatusOK, "profile updated", user.Profile())
 }
