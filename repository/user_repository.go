@@ -14,6 +14,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id uint) (models.User, error)
 	FindByEmail(ctx context.Context, email string) (models.User, error)
 	UpdatePassword(ctx context.Context, id uint, hash string) error
+	Update(ctx context.Context, user *models.User) error
 }
 
 type PostgresUserRepo struct {
@@ -59,4 +60,9 @@ func (repo *PostgresUserRepo) UpdatePassword(ctx context.Context, id uint, hash 
 		Model(&models.User{}).
 		Where("id = ?", id).
 		Update("password", hash).Error
+}
+
+
+func (repo *PostgresUserRepo) Update(ctx context.Context, user *models.User) error {
+    return repo.db.WithContext(ctx).Save(user).Error
 }

@@ -67,6 +67,7 @@ type UserService interface {
 	GetActiveUser(ctx context.Context, id uint) (models.User, error)
 	Logout(ctx context.Context, claims *auth.Claims) error
 	ChangePassword(ctx context.Context, claims *auth.Claims, req ChangePasswordRequest) error
+	UpdateUserProfile(ctx context.Context, userID uint, input models.ProfileUpdate) error
 }
 
 type userService struct {
@@ -294,3 +295,18 @@ func (s *userService) ChangePassword(ctx context.Context, claims *auth.Claims, r
 	// End this session so the client must log in again with the new password.
 	return s.tokens.Revoke(ctx, claims)
 }
+
+
+
+func (s *userService) UpdateUserProfile(ctx context.Context, userID uint, input models.ProfileUpdate) error {
+    user, err := s.userRepo.FindByID(ctx, userID) 
+    if err != nil {
+        return err
+    }
+
+    if err := user.UpdateProfile(input); err != nil {
+        return err
+    }
+    return s.userRepo.Update(ctx, &user)
+}
+
