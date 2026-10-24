@@ -19,6 +19,7 @@ var (
 	ErrRestaurantClosed     = errors.New("restaurant cannot accept menu items")
 	ErrCategoryIDRequired   = errors.New("category_id is required")
 	ErrCategoryNotFound     = errors.New("category not found")
+	ErrMenuItemNotFound     = errors.New("menu item not found")
 )
 
 // CreateMenuItemRequest is the body for POST /menu.
@@ -34,6 +35,12 @@ type CreateMenuItemRequest struct {
 
 type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
+	UpdateMenuItemAvailability(
+		ctx context.Context,
+		userID uint,
+		ItemID uint,
+		available bool,
+	) error
 }
 
 type menuService struct {
@@ -93,4 +100,51 @@ func (s *menuService) CreateMenuItem(ctx context.Context, userID uint, req Creat
 		return nil, err
 	}
 	return &item, nil
+}
+
+// UpdateMenuItemAvailability allows a restaurant manager
+// to mark their menu item as available or unavailable.
+func (s *menuService) UpdateMenuItemAvailability(
+	ctx context.Context,
+	userID uint,
+	itemID uint,
+	available bool,
+) error {
+
+	// Find the menu item
+	item, err := s.menuRepo.FindMenuItemByID(ctx, itemID)
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrMenuItemNotFound
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Find the restaurant that own the menu item.
+	restaurant, err := s.menuRepo.FindRestaurantByID(
+		ctx,
+		item.RestaurantID,
+	)
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrRestaurantNotFound
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Check that the logged-in user manages this restaurant.
+	if restaurant.ManagerID != userID {
+		return ErrNotYourRestaurant
+	}
+
+	// Update the availablilty in PostgreSQL
+	return s.menuRepo.UpdateMenuItemAvailability(
+		ctx,
+		itemID,
+		available,
+	)
 }

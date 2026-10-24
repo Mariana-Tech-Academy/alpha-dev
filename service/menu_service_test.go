@@ -12,9 +12,13 @@ import (
 
 type fakeMenuRepo struct {
 	restaurant models.Restaurant
-	findRest   error
-	findCat    error
-	created    *models.MenuItem
+	findRest    error
+	findCat     error
+	created     *models.MenuItem
+
+	item        models.MenuItem
+    findItemErr error
+	updateErr   error
 }
 
 func (f *fakeMenuRepo) FindRestaurantByID(context.Context, uint) (models.Restaurant, error) {
@@ -30,6 +34,30 @@ func (f *fakeMenuRepo) CreateMenuItem(_ context.Context, item *models.MenuItem) 
 	f.created = item
 	return nil
 }
+
+// FindMenuItemByID simulats retrieving a menu item.
+func (f *fakeMenuRepo) FindMenuItemByID(
+	ctx context.Context,
+	id uint,
+) (models.MenuItem, error) {
+	return f.item, f.findItemErr
+}
+
+// UpdateMenuItemAvailability simultes changing availability
+func (f *fakeMenuRepo) UpdateMenuItemAvailability(
+	ctx context.Context,
+	id uint,
+	available bool,
+) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
+
+    f.item.Available = available
+    return nil
+}
+
+
 
 func validMenuRequest() CreateMenuItemRequest {
 	return CreateMenuItemRequest{
