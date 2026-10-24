@@ -12,12 +12,12 @@ import (
 
 type fakeMenuRepo struct {
 	restaurant models.Restaurant
-	findRest    error
-	findCat     error
-	created     *models.MenuItem
+	findRest   error
+	findCat    error
+	created    *models.MenuItem
 
 	item        models.MenuItem
-    findItemErr error
+	findItemErr error
 	updateErr   error
 }
 
@@ -53,11 +53,9 @@ func (f *fakeMenuRepo) UpdateMenuItemAvailability(
 		return f.updateErr
 	}
 
-    f.item.Available = available
-    return nil
+	f.item.Available = available
+	return nil
 }
-
-
 
 func validMenuRequest() CreateMenuItemRequest {
 	return CreateMenuItemRequest{
