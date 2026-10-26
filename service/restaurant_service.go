@@ -47,6 +47,7 @@ type RestaurantService interface {
 		nextStatus models.RestaurantStatus,
 	) error
 	UpdateRestaurant(ctx context.Context, id uint, userID uint, role models.Role, input *models.UpdateRestaurantInput, file *multipart.FileHeader) (*models.Restaurant, error)
+	GetRestaurantDetails(ctx context.Context, id uint) (models.RestaurantDetails, error)
 }
 
 type restaurantService struct {
@@ -297,4 +298,34 @@ func (s *restaurantService) UpdateRestaurant(ctx context.Context, id uint, userI
 		return nil, fmt.Errorf("failed to update: %w", err)
 	}
 	return &restaurant, nil
+}
+
+func (s *restaurantService) GetRestaurantDetails(ctx context.Context, id uint) (models.RestaurantDetails, error) {
+	restaurant, err := s.restaurantRepo.FindActiveByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.RestaurantDetails{}, ErrRestaurantNotFound
+	}
+	if err != nil {
+		return models.RestaurantDetails{}, err
+	}
+
+	menu := make([]models.PublicMenuItem, 0, len(restaurant.MenuItems))
+	for _, item := range restaurant.MenuItems {
+		if !item.Available {
+			continue
+		}
+		menu = append(menu, models.PublicMenuItem{
+			ID:          item.ID,
+			Name:        item.Name,
+			Description: item.Description,
+			Price:       item.Price,
+			ImageURL:    item.ImageURL,
+			Category:    item.Category.Name,
+		})
+	}
+
+	return models.RestaurantDetails{
+		RestaurantProfile: restaurant.Profile(),
+		MenuItems:         menu,
+	}, nil
 }

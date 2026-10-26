@@ -11,6 +11,7 @@ import (
 type RestaurantRepository interface {
 	Create(ctx context.Context, restaurant *models.Restaurant) error
 	FindByID(ctx context.Context, id uint) (models.Restaurant, error)
+	FindActiveByID(ctx context.Context, id uint) (models.Restaurant, error)
 	UpdateFields(ctx context.Context, id uint, fields map[string]any) error
 	UpdateAvailability(
 		ctx context.Context,
@@ -36,6 +37,16 @@ func (repo *PostgresRestaurantRepo) Create(ctx context.Context, restaurant *mode
 func (repo *PostgresRestaurantRepo) FindByID(ctx context.Context, id uint) (models.Restaurant, error) {
 	var restaurant models.Restaurant
 	err := repo.db.WithContext(ctx).First(&restaurant, id).Error
+	return restaurant, err
+}
+
+func (repo *PostgresRestaurantRepo) FindActiveByID(ctx context.Context, id uint) (models.Restaurant, error) {
+	var restaurant models.Restaurant
+	err := repo.db.WithContext(ctx).
+		Where("status = ?", models.RestaurantStatusActive).
+		Preload("MenuItems", "available = ?", true).
+		Preload("MenuItems.Category").
+		First(&restaurant, id).Error
 	return restaurant, err
 }
 

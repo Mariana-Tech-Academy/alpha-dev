@@ -220,6 +220,27 @@ func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Requ
 	utils.Success(w, http.StatusOK, "restaurant updated", updated.Profile())
 }
 
+func (h *RestaurantHandler) GetRestaurantDetails(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
+	if err != nil || id == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant ID")
+		return
+	}
+
+	restaurant, err := h.RestaurantService.GetRestaurantDetails(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, service.ErrRestaurantNotFound) {
+			utils.Error(w, http.StatusNotFound, "restaurant not found")
+			return
+		}
+		log.Printf("get restaurant %d: %v", id, err)
+		utils.Error(w, http.StatusInternalServerError, "unable to load restaurant")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurant retrieved", restaurant)
+}
+
 // formField returns the value when the multipart form included the key, including a blank value.
 func formField(r *http.Request, key string) *string {
 	if r.MultipartForm == nil {

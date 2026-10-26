@@ -66,6 +66,22 @@ func (r *Restaurant) Profile() RestaurantProfile {
 	}
 }
 
+// PublicMenuItem is a customer-facing menu row.
+type PublicMenuItem struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Price       int64  `json:"price"`
+	ImageURL    string `json:"image_url,omitempty"`
+	Category    string `json:"category"`
+}
+
+// RestaurantDetails is the public restaurant page, including available menu items.
+type RestaurantDetails struct {
+	RestaurantProfile
+	MenuItems []PublicMenuItem `json:"menu_items"`
+}
+
 type UpdateRestaurantInput struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
