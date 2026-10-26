@@ -20,6 +20,10 @@ var (
 	ErrCategoryIDRequired   = errors.New("category_id is required")
 	ErrCategoryNotFound     = errors.New("category not found")
 	ErrMenuItemNotFound     = errors.New("menu item not found")
+	ErrInvalidPriceRange    = errors.New("min_price cannot be greater than max_price")
+	ErrInvalidPriceBound    = errors.New("min_price and max_price must be zero or greater")
+	ErrInvalidCategoryID    = errors.New("category_id must be a positive number")
+	ErrInvalidRestaurantID  = errors.New("restaurant_id must be a positive number")
 )
 
 // CreateMenuItemRequest is the body for POST /menu.
@@ -39,6 +43,19 @@ type MenuService interface {
 	GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error)
 	UpdateMenuItem(ctx context.Context, userID uint, id uint, req UpdateMenuItemRequest) (*models.MenuItem, error)
 	DeleteMenuItem(ctx context.Context, userID uint, id uint) error
+	SearchMenuItems(ctx context.Context, search MenuSearch) ([]models.MenuSearchResult, error)
+}
+
+// MenuSearch is the query for GET /menu.
+type MenuSearch struct {
+	Query        string
+	CategoryID   *uint
+	RestaurantID *uint
+	MinPrice     *int64
+	MaxPrice     *int64
+	Available    *bool
+	Page         int
+	Limit        int
 }
 
 type menuService struct {
@@ -154,4 +171,57 @@ func (s *menuService) GetMenuItemDetails(ctx context.Context, id uint) (models.P
 		ImageURL:    item.ImageURL,
 		Category:    item.Category.Name,
 	}, nil
+}
+
+const maxMenuPageSize = 20
+
+func (s *menuService) SearchMenuItems(ctx context.Context, search MenuSearch) ([]models.MenuSearchResult, error) {
+	search.Query = strings.TrimSpace(search.Query)
+	if search.CategoryID != nil && *search.CategoryID == 0 {
+		return nil, ErrInvalidCategoryID
+	}
+	if search.RestaurantID != nil && *search.RestaurantID == 0 {
+		return nil, ErrInvalidRestaurantID
+	}
+	if (search.MinPrice != nil && *search.MinPrice < 0) || (search.MaxPrice != nil && *search.MaxPrice < 0) {
+		return nil, ErrInvalidPriceBound
+	}
+	if search.MinPrice != nil && search.MaxPrice != nil && *search.MinPrice > *search.MaxPrice {
+		return nil, ErrInvalidPriceRange
+	}
+	if search.Page < 1 {
+		search.Page = 1
+	}
+	if search.Limit < 1 {
+		search.Limit = 10
+	}
+	if search.Limit > maxMenuPageSize {
+		search.Limit = maxMenuPageSize
+	}
+	available := true
+	if search.Available != nil {
+		available = *search.Available
+	}
+
+	items, err := s.menuRepo.SearchMenuItems(ctx, repository.MenuSearchQuery{
+		Query:        escapeLike(search.Query),
+		CategoryID:   search.CategoryID,
+		RestaurantID: search.RestaurantID,
+		MinPrice:     search.MinPrice,
+		MaxPrice:     search.MaxPrice,
+		Available:    available,
+		Limit:        search.Limit,
+		Offset:       (search.Page - 1) * search.Limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = []models.MenuSearchResult{}
+	}
+	return items, nil
+}
+
+func escapeLike(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(value)
 }
