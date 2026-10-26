@@ -162,6 +162,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 			"cart_id":      item.CartID,
 			"menu_item_id": item.MenuItemID,
 			"quantity":     item.Quantity,
+			"price":        item.MenuItem.Price,
 		},
 	)
 }
