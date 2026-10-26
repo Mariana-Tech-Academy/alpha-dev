@@ -85,20 +85,20 @@ func (s *cartService) AddItem(
 	}
 
 	// Add the item to the customer's cart.
- item, err := s.cartRepo.AddItem(
-    ctx,
-    userID,
-    menuItemID,
-    menuItem.RestaurantID,
-    quantity,
- )
+	item, err := s.cartRepo.AddItem(
+		ctx,
+		userID,
+		menuItemID,
+		menuItem.RestaurantID,
+		quantity,
+	)
 
- if err != nil {
-    return nil, err
-}
+	if err != nil {
+		return nil, err
+	}
 
-// Include the current menu item details in the response.
-item.MenuItem = menuItem
+	// Include the current menu item details in the response.
+	item.MenuItem = menuItem
 
-return item, nil
+	return item, nil
 }
