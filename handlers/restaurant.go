@@ -241,6 +241,31 @@ func (h *RestaurantHandler) GetRestaurantDetails(w http.ResponseWriter, r *http.
 	utils.Success(w, http.StatusOK, "restaurant retrieved", restaurant)
 }
 
+func (h *RestaurantHandler) ListActiveRestaurants(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	profiles, err := h.RestaurantService.ListActiveRestaurants(r.Context(), page, limit)
+	if err != nil {
+		log.Printf("list restaurants: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurants retrieved", profiles)
+}
+
 // formField returns the value when the multipart form included the key, including a blank value.
 func formField(r *http.Request, key string) *string {
 	if r.MultipartForm == nil {

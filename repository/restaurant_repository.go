@@ -20,6 +20,7 @@ type RestaurantRepository interface {
 		currentStatus models.RestaurantStatus,
 		nextStatus models.RestaurantStatus,
 	) (bool, error)
+	GetActiveRestaurants(ctx context.Context, page, limit int) ([]models.Restaurant, error)
 }
 
 type PostgresRestaurantRepo struct {
@@ -75,4 +76,16 @@ func (repo *PostgresRestaurantRepo) UpdateAvailability(
 		Update("status", nextStatus)
 
 	return result.RowsAffected == 1, result.Error
+}
+
+func (repo *PostgresRestaurantRepo) GetActiveRestaurants(ctx context.Context, page, limit int) ([]models.Restaurant, error) {
+	var restaurants []models.Restaurant
+	offset := (page - 1) * limit
+	err := repo.db.WithContext(ctx).
+		Where("status = ?", models.RestaurantStatusActive).
+		Order("id").
+		Limit(limit).
+		Offset(offset).
+		Find(&restaurants).Error
+	return restaurants, err
 }

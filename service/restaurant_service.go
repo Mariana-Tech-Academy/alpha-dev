@@ -48,6 +48,7 @@ type RestaurantService interface {
 	) error
 	UpdateRestaurant(ctx context.Context, id uint, userID uint, role models.Role, input *models.UpdateRestaurantInput, file *multipart.FileHeader) (*models.Restaurant, error)
 	GetRestaurantDetails(ctx context.Context, id uint) (models.RestaurantDetails, error)
+	ListActiveRestaurants(ctx context.Context, page, limit int) ([]models.RestaurantProfile, error)
 }
 
 type restaurantService struct {
@@ -328,4 +329,29 @@ func (s *restaurantService) GetRestaurantDetails(ctx context.Context, id uint) (
 		RestaurantProfile: restaurant.Profile(),
 		MenuItems:         menu,
 	}, nil
+}
+
+const maxRestaurantPageSize = 20
+
+func (s *restaurantService) ListActiveRestaurants(ctx context.Context, page, limit int) ([]models.RestaurantProfile, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > maxRestaurantPageSize {
+		limit = maxRestaurantPageSize
+	}
+
+	restaurants, err := s.restaurantRepo.GetActiveRestaurants(ctx, page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	profiles := make([]models.RestaurantProfile, 0, len(restaurants))
+	for _, restaurant := range restaurants {
+		profiles = append(profiles, restaurant.Profile())
+	}
+	return profiles, nil
 }

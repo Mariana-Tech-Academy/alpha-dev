@@ -119,3 +119,24 @@ func (h *MenuHandler) UpdateMenuItemAvailability(w http.ResponseWriter, r *http.
 
 	utils.Success(w, http.StatusOK, "menu item availability updated", item)
 }
+
+func (h *MenuHandler) GetMenuItemDetails(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
+	if err != nil || id == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid menu item ID")
+		return
+	}
+
+	item, err := h.MenuService.GetMenuItemDetails(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, service.ErrMenuItemNotFound) {
+			utils.Error(w, http.StatusNotFound, err.Error())
+			return
+		}
+		log.Printf("get menu item %d: %v", id, err)
+		utils.Error(w, http.StatusInternalServerError, "unable to fetch menu item")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "menu item retrieved", item)
+}
