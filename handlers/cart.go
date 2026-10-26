@@ -119,7 +119,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 
-		case errors.Is(err, service.ErrMenuItemNotFound):
+		case errors.Is(err, service.ErrCartMenuItemNotFound):
 			utils.Error(
 				w,
 				http.StatusNotFound,
