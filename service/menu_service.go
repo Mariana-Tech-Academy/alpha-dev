@@ -35,12 +35,7 @@ type CreateMenuItemRequest struct {
 
 type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
-	UpdateMenuItemAvailability(
-		ctx context.Context,
-		userID uint,
-		ItemID uint,
-		available bool,
-	) error
+	UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error)
 }
 
 type menuService struct {
@@ -102,49 +97,36 @@ func (s *menuService) CreateMenuItem(ctx context.Context, userID uint, req Creat
 	return &item, nil
 }
 
-// UpdateMenuItemAvailability allows a restaurant manager
-// to mark their menu item as available or unavailable.
-func (s *menuService) UpdateMenuItemAvailability(
-	ctx context.Context,
-	userID uint,
-	itemID uint,
-	available bool,
-) error {
-
-	// Find the menu item
+func (s *menuService) UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error) {
 	item, err := s.menuRepo.FindMenuItemByID(ctx, itemID)
-
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ErrMenuItemNotFound
+		return nil, ErrMenuItemNotFound
 	}
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Find the restaurant that own the menu item.
-	restaurant, err := s.menuRepo.FindRestaurantByID(
-		ctx,
-		item.RestaurantID,
-	)
-
+	restaurant, err := s.menuRepo.FindRestaurantByID(ctx, item.RestaurantID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ErrRestaurantNotFound
+		return nil, ErrRestaurantNotFound
 	}
-
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// Check that the logged-in user manages this restaurant.
 	if restaurant.ManagerID != userID {
-		return ErrNotYourRestaurant
+		return nil, ErrNotYourRestaurant
+	}
+	if restaurant.Status != models.RestaurantStatusActive && restaurant.Status != models.RestaurantStatusInactive {
+		return nil, ErrRestaurantClosed
 	}
 
-	// Update the availablilty in PostgreSQL
-	return s.menuRepo.UpdateMenuItemAvailability(
-		ctx,
-		itemID,
-		available,
-	)
+	if err := s.menuRepo.UpdateMenuItemAvailability(ctx, itemID, available); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrMenuItemNotFound
+		}
+		return nil, err
+	}
+
+	item.Available = available
+	return &item, nil
 }
