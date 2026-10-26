@@ -22,6 +22,10 @@ type fakeMenuRepo struct {
 	updatedID        uint
 	updatedAvailable bool
 	didUpdate        bool
+	saved            map[string]any
+	savedID          uint
+	deletedID        uint
+	didDelete        bool
 }
 
 func (f *fakeMenuRepo) FindRestaurantByID(context.Context, uint) (models.Restaurant, error) {
@@ -50,6 +54,18 @@ func (f *fakeMenuRepo) UpdateMenuItemAvailability(_ context.Context, id uint, av
 		return f.updateErr
 	}
 	f.item.Available = available
+	return nil
+}
+
+func (f *fakeMenuRepo) UpdateMenuItem(_ context.Context, id uint, fields map[string]any) error {
+	f.savedID = id
+	f.saved = fields
+	return nil
+}
+
+func (f *fakeMenuRepo) DeleteMenuItem(_ context.Context, id uint) error {
+	f.deletedID = id
+	f.didDelete = true
 	return nil
 }
 
@@ -259,6 +275,120 @@ func TestGetMenuItemDetails(t *testing.T) {
 		_, err := NewMenuService(&fakeMenuRepo{item: hidden}).GetMenuItemDetails(context.Background(), 9)
 		if !errors.Is(err, ErrMenuItemNotFound) {
 			t.Fatalf("expected ErrMenuItemNotFound, got %v", err)
+		}
+	})
+}
+
+func TestUpdateMenuItem(t *testing.T) {
+	active := models.Restaurant{ManagerID: 4, Status: models.RestaurantStatusActive}
+	item := models.MenuItem{RestaurantID: 3, Name: "Old", Available: true}
+	item.ID = 9
+	req := UpdateMenuItemRequest{
+		Name:        "  New Name  ",
+		Description: "  cheese ",
+		Price:       1500,
+		ImageURL:    "  pizza.jpg ",
+		CategoryID:  2,
+	}
+
+	t.Run("owner updates the item", func(t *testing.T) {
+		repo := &fakeMenuRepo{restaurant: active, item: item}
+		updated, err := NewMenuService(repo).UpdateMenuItem(context.Background(), 4, 9, req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if updated.Name != "New Name" || updated.Description != "cheese" || updated.ImageURL != "pizza.jpg" || !updated.Available {
+			t.Fatalf("item = %+v", updated)
+		}
+		if repo.savedID != 9 || repo.saved["name"] != "New Name" || repo.saved["price"] != int64(1500) || repo.saved["category_id"] != uint(2) {
+			t.Fatalf("saved = %#v", repo.saved)
+		}
+		if _, ok := repo.saved["available"]; ok {
+			t.Fatal("availability was saved")
+		}
+	})
+
+	t.Run("another manager", func(t *testing.T) {
+		repo := &fakeMenuRepo{restaurant: active, item: item}
+		_, err := NewMenuService(repo).UpdateMenuItem(context.Background(), 8, 9, req)
+		if !errors.Is(err, ErrNotYourRestaurant) {
+			t.Fatalf("expected ErrNotYourRestaurant, got %v", err)
+		}
+		if repo.saved != nil {
+			t.Fatal("item was saved")
+		}
+	})
+
+	t.Run("missing item", func(t *testing.T) {
+		_, err := NewMenuService(&fakeMenuRepo{findItemErr: gorm.ErrRecordNotFound}).UpdateMenuItem(context.Background(), 4, 9, req)
+		if !errors.Is(err, ErrMenuItemNotFound) {
+			t.Fatalf("expected ErrMenuItemNotFound, got %v", err)
+		}
+	})
+
+	t.Run("empty name", func(t *testing.T) {
+		bad := req
+		bad.Name = "  "
+		_, err := NewMenuService(&fakeMenuRepo{restaurant: active, item: item}).UpdateMenuItem(context.Background(), 4, 9, bad)
+		if !errors.Is(err, ErrNameRequired) {
+			t.Fatalf("expected ErrNameRequired, got %v", err)
+		}
+	})
+
+	t.Run("price must be positive", func(t *testing.T) {
+		bad := req
+		bad.Price = 0
+		_, err := NewMenuService(&fakeMenuRepo{restaurant: active, item: item}).UpdateMenuItem(context.Background(), 4, 9, bad)
+		if !errors.Is(err, ErrInvalidPrice) {
+			t.Fatalf("expected ErrInvalidPrice, got %v", err)
+		}
+	})
+
+	t.Run("missing category", func(t *testing.T) {
+		_, err := NewMenuService(&fakeMenuRepo{restaurant: active, item: item, findCat: gorm.ErrRecordNotFound}).UpdateMenuItem(context.Background(), 4, 9, req)
+		if !errors.Is(err, ErrCategoryNotFound) {
+			t.Fatalf("expected ErrCategoryNotFound, got %v", err)
+		}
+	})
+
+	t.Run("pending restaurant", func(t *testing.T) {
+		pending := active
+		pending.Status = models.RestaurantStatusPending
+		repo := &fakeMenuRepo{restaurant: pending, item: item}
+		_, err := NewMenuService(repo).UpdateMenuItem(context.Background(), 4, 9, req)
+		if !errors.Is(err, ErrRestaurantClosed) {
+			t.Fatalf("expected ErrRestaurantClosed, got %v", err)
+		}
+		if repo.saved != nil {
+			t.Fatal("item was saved")
+		}
+	})
+}
+
+func TestDeleteMenuItem(t *testing.T) {
+	active := models.Restaurant{ManagerID: 4, Status: models.RestaurantStatusActive}
+	item := models.MenuItem{RestaurantID: 3}
+	item.ID = 9
+
+	t.Run("owner deletes the item", func(t *testing.T) {
+		repo := &fakeMenuRepo{restaurant: active, item: item}
+		err := NewMenuService(repo).DeleteMenuItem(context.Background(), 4, 9)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !repo.didDelete || repo.deletedID != 9 {
+			t.Fatalf("deleted id = %d", repo.deletedID)
+		}
+	})
+
+	t.Run("another manager", func(t *testing.T) {
+		repo := &fakeMenuRepo{restaurant: active, item: item}
+		err := NewMenuService(repo).DeleteMenuItem(context.Background(), 8, 9)
+		if !errors.Is(err, ErrNotYourRestaurant) {
+			t.Fatalf("expected ErrNotYourRestaurant, got %v", err)
+		}
+		if repo.didDelete {
+			t.Fatal("item was deleted")
 		}
 	})
 }
