@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	ErrInvalidQuantity  = errors.New("quantity must be at least 1")
-	ErrMenuItemNotFound = errors.New("menu item not found")
-	ErrItemUnavailable  = errors.New("menu item is unavailable")
-	ErrInvalidMenuItem  = errors.New("invalid menu item ID")
-	ErrInvalidUser      = errors.New("invalid user ID")
+	ErrInvalidQuantity = errors.New("quantity must be at least 1")
+
+	ErrCartMenuItemNotFound = errors.New("menu item not found")
+	ErrItemUnavailable      = errors.New("menu item is unavailable")
+	ErrInvalidMenuItem      = errors.New("invalid menu item ID")
+	ErrInvalidUser          = errors.New("invalid user ID")
 )
 
 type CartService interface {
@@ -71,7 +72,7 @@ func (s *cartService) AddItem(
 		First(&menuItem, menuItemID).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrMenuItemNotFound
+		return nil, ErrCartMenuItemNotFound
 	}
 
 	if err != nil {
