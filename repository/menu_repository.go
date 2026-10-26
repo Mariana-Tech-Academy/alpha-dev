@@ -12,6 +12,8 @@ type MenuRepository interface {
 	FindRestaurantByID(ctx context.Context, id uint) (models.Restaurant, error)
 	FindCategoryByID(ctx context.Context, id uint) (models.Category, error)
 	CreateMenuItem(ctx context.Context, item *models.MenuItem) error
+	FindMenuItemByID(ctx context.Context, id uint) (models.MenuItem, error)
+	UpdateMenuItemAvailability(ctx context.Context, id uint, available bool) error
 }
 
 type PostgresMenuRepo struct {
@@ -36,4 +38,24 @@ func (repo *PostgresMenuRepo) FindCategoryByID(ctx context.Context, id uint) (mo
 
 func (repo *PostgresMenuRepo) CreateMenuItem(ctx context.Context, item *models.MenuItem) error {
 	return repo.db.WithContext(ctx).Create(item).Error
+}
+
+func (repo *PostgresMenuRepo) FindMenuItemByID(ctx context.Context, id uint) (models.MenuItem, error) {
+	var item models.MenuItem
+	err := repo.db.WithContext(ctx).First(&item, id).Error
+	return item, err
+}
+
+func (repo *PostgresMenuRepo) UpdateMenuItemAvailability(ctx context.Context, id uint, available bool) error {
+	result := repo.db.WithContext(ctx).
+		Model(&models.MenuItem{}).
+		Where("id = ?", id).
+		Update("available", available)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

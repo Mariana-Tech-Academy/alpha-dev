@@ -26,4 +26,6 @@ func MenuRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	manager.Use(middleware.RequireRole(models.RoleManager))
 
 	manager.HandleFunc("/menu", menuHandler.CreateMenuItem).Methods(http.MethodPost)
+
+	manager.HandleFunc("/menu/{id}/availability", menuHandler.UpdateMenuItemAvailability).Methods(http.MethodPatch)
 }

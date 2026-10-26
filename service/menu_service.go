@@ -19,6 +19,7 @@ var (
 	ErrRestaurantClosed     = errors.New("restaurant cannot accept menu items")
 	ErrCategoryIDRequired   = errors.New("category_id is required")
 	ErrCategoryNotFound     = errors.New("category not found")
+	ErrMenuItemNotFound     = errors.New("menu item not found")
 )
 
 // CreateMenuItemRequest is the body for POST /menu.
@@ -34,6 +35,7 @@ type CreateMenuItemRequest struct {
 
 type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
+	UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error)
 }
 
 type menuService struct {
@@ -92,5 +94,39 @@ func (s *menuService) CreateMenuItem(ctx context.Context, userID uint, req Creat
 	if err := s.menuRepo.CreateMenuItem(ctx, &item); err != nil {
 		return nil, err
 	}
+	return &item, nil
+}
+
+func (s *menuService) UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error) {
+	item, err := s.menuRepo.FindMenuItemByID(ctx, itemID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrMenuItemNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	restaurant, err := s.menuRepo.FindRestaurantByID(ctx, item.RestaurantID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRestaurantNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if restaurant.ManagerID != userID {
+		return nil, ErrNotYourRestaurant
+	}
+	if restaurant.Status != models.RestaurantStatusActive && restaurant.Status != models.RestaurantStatusInactive {
+		return nil, ErrRestaurantClosed
+	}
+
+	if err := s.menuRepo.UpdateMenuItemAvailability(ctx, itemID, available); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrMenuItemNotFound
+		}
+		return nil, err
+	}
+
+	item.Available = available
 	return &item, nil
 }
