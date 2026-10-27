@@ -37,6 +37,8 @@ type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
 	UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error)
 	GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error)
+	UpdateMenuItem(ctx context.Context, userID uint, id uint, req UpdateMenuItemRequest) (*models.MenuItem, error)
+	DeleteMenuItem(ctx context.Context, userID uint, id uint) error
 }
 
 type menuService struct {

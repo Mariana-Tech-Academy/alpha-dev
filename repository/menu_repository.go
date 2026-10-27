@@ -14,6 +14,8 @@ type MenuRepository interface {
 	CreateMenuItem(ctx context.Context, item *models.MenuItem) error
 	FindMenuItemByID(ctx context.Context, id uint) (models.MenuItem, error)
 	UpdateMenuItemAvailability(ctx context.Context, id uint, available bool) error
+	UpdateMenuItem(ctx context.Context, id uint, fields map[string]any) error
+	DeleteMenuItem(ctx context.Context, id uint) error
 }
 
 type PostgresMenuRepo struct {
