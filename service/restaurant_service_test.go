@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"alpha-dev/models"
+
+	"gorm.io/gorm"
 )
 
 type fakeRestaurantRepo struct {
@@ -25,6 +27,16 @@ func (f *fakeRestaurantRepo) Create(_ context.Context, restaurant *models.Restau
 
 func (f *fakeRestaurantRepo) FindByID(context.Context, uint) (models.Restaurant, error) {
 	return f.found, f.findErr
+}
+
+func (f *fakeRestaurantRepo) FindActiveByID(_ context.Context, id uint) (models.Restaurant, error) {
+	if f.findErr != nil {
+		return models.Restaurant{}, f.findErr
+	}
+	if f.found.ID != id || f.found.Status != models.RestaurantStatusActive {
+		return models.Restaurant{}, gorm.ErrRecordNotFound
+	}
+	return f.found, nil
 }
 
 func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, models.RestaurantStatus, models.RestaurantStatus) (bool, error) {
@@ -217,6 +229,46 @@ func TestUpdateRestaurant(t *testing.T) {
 		})
 		if !errors.Is(err, ErrInvalidImage) {
 			t.Fatalf("expected ErrInvalidImage, got %v", err)
+		}
+	})
+}
+
+func TestGetRestaurantDetails(t *testing.T) {
+	available := models.MenuItem{Name: "Margherita", Description: "tomato", Price: 1250, Available: true}
+	available.ID = 9
+	available.Category.Name = "Pizza"
+	unavailable := models.MenuItem{Name: "Sold out", Available: false}
+	unavailable.ID = 10
+
+	active := ownedRestaurant()
+	active.MenuItems = []models.MenuItem{available, unavailable}
+
+	t.Run("returns an active restaurant and its available menu", func(t *testing.T) {
+		details, err := NewRestaurantService(&fakeRestaurantRepo{found: active}).GetRestaurantDetails(context.Background(), 3)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if details.ID != 3 || details.Name != "Pizza Place" || details.Status != models.RestaurantStatusActive {
+			t.Fatalf("details = %+v", details)
+		}
+		if len(details.MenuItems) != 1 || details.MenuItems[0].Name != "Margherita" || details.MenuItems[0].Category != "Pizza" {
+			t.Fatalf("menu = %+v", details.MenuItems)
+		}
+	})
+
+	t.Run("missing restaurant", func(t *testing.T) {
+		_, err := NewRestaurantService(&fakeRestaurantRepo{findErr: gorm.ErrRecordNotFound}).GetRestaurantDetails(context.Background(), 3)
+		if !errors.Is(err, ErrRestaurantNotFound) {
+			t.Fatalf("expected ErrRestaurantNotFound, got %v", err)
+		}
+	})
+
+	t.Run("inactive restaurant", func(t *testing.T) {
+		inactive := active
+		inactive.Status = models.RestaurantStatusInactive
+		_, err := NewRestaurantService(&fakeRestaurantRepo{found: inactive}).GetRestaurantDetails(context.Background(), 3)
+		if !errors.Is(err, ErrRestaurantNotFound) {
+			t.Fatalf("expected ErrRestaurantNotFound, got %v", err)
 		}
 	})
 }
