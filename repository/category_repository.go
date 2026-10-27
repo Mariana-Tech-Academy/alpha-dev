@@ -1,15 +1,18 @@
 package repository
 
 import (
+	"context"
+
 	"alpha-dev/models"
 
 	"gorm.io/gorm"
 )
 
 type CategoryRepository interface {
-	Create(cat *models.Category) error
-	FindAll() ([]models.Category, error)
-	FindByID(id uint) (*models.Category, error)
+	Create(ctx context.Context, cat *models.Category) error
+	FindAll(ctx context.Context) ([]models.Category, error)
+	FindByID(ctx context.Context, id uint) (models.Category, error)
+	FindPublicMenuItems(ctx context.Context, categoryID uint) ([]models.CategoryMenuItem, error)
 }
 
 type PostgresCategoryRepo struct {
@@ -20,29 +23,32 @@ func NewCategoryRepository(db *gorm.DB) CategoryRepository {
 	return &PostgresCategoryRepo{db: db}
 }
 
-//Create a new category in the database
-
-func (r *PostgresCategoryRepo) Create(cat *models.Category) error {
-	return r.db.Create(cat).Error
+func (r *PostgresCategoryRepo) Create(ctx context.Context, cat *models.Category) error {
+	return r.db.WithContext(ctx).Create(cat).Error
 }
 
-// Get all categories with thier menu items with it.
-
-func (r *PostgresCategoryRepo) FindAll() ([]models.Category, error) {
-	var cats []models.Category
-	err := r.db.Preload("MenuItems").Find(&cats).Error
-
+func (r *PostgresCategoryRepo) FindAll(ctx context.Context) ([]models.Category, error) {
+	cats := make([]models.Category, 0)
+	err := r.db.WithContext(ctx).Order("name ASC, id ASC").Find(&cats).Error
 	return cats, err
 }
 
-// Get a category by ID wirh its Menu items loaded.
-func (r *PostgresCategoryRepo) FindByID(id uint) (*models.Category, error) {
+func (r *PostgresCategoryRepo) FindByID(ctx context.Context, id uint) (models.Category, error) {
 	var cat models.Category
-	err := r.db.Preload("MenuItems").Find(&cat, id).Error
+	err := r.db.WithContext(ctx).First(&cat, id).Error
+	return cat, err
+}
 
-	if err != nil {
-		return nil, err
-	}
-	return &cat, nil
-
+func (r *PostgresCategoryRepo) FindPublicMenuItems(ctx context.Context, categoryID uint) ([]models.CategoryMenuItem, error) {
+	items := make([]models.CategoryMenuItem, 0)
+	err := r.db.WithContext(ctx).
+		Model(&models.MenuItem{}).
+		Select("menu_items.id, menu_items.name, menu_items.description, menu_items.price, menu_items.image_url, menu_items.restaurant_id, restaurants.name AS restaurant_name").
+		Joins("JOIN restaurants ON restaurants.id = menu_items.restaurant_id AND restaurants.deleted_at IS NULL").
+		Where("menu_items.category_id = ?", categoryID).
+		Where("menu_items.available = ?", true).
+		Where("restaurants.status = ?", models.RestaurantStatusActive).
+		Order("menu_items.name ASC, menu_items.id ASC").
+		Scan(&items).Error
+	return items, err
 }

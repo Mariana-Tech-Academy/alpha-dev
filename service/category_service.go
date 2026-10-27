@@ -1,16 +1,32 @@
 package service
 
 import (
-	"alpha-dev/models"
-	"alpha-dev/repository"
+	"context"
 	"errors"
 	"strings"
+
+	"alpha-dev/models"
+	"alpha-dev/repository"
+
+	"gorm.io/gorm"
 )
 
+const maxCategoryNameLength = 100
+
+var ErrCategoryExists = errors.New("category already exists")
+
+type CategoryValidationError struct {
+	Fields map[string]string
+}
+
+func (err *CategoryValidationError) Error() string {
+	return "invalid category"
+}
+
 type CategoryService interface {
-	CreateCategory(name string) (*models.Category, error)
-	GetCategories() ([]models.Category, error)
-	GetCategoryByID(id uint) (*models.Category, error)
+	CreateCategory(ctx context.Context, name string) (models.CategorySummary, error)
+	GetCategories(ctx context.Context) ([]models.CategorySummary, error)
+	GetCategoryByID(ctx context.Context, id uint) (models.CategoryDetails, error)
 }
 
 type categoryService struct {
@@ -21,28 +37,61 @@ func NewCategoryService(repo repository.CategoryRepository) CategoryService {
 	return &categoryService{categoryRepo: repo}
 }
 
-// Validate name, then save it via the repository
-func (s *categoryService) CreateCategory(name string) (*models.Category, error) {
+func (s *categoryService) CreateCategory(ctx context.Context, name string) (models.CategorySummary, error) {
 	name = strings.TrimSpace(name)
+	fields := map[string]string{}
 	if name == "" {
-		return nil, errors.New("name is required")
+		fields["name"] = "name is required"
+	} else if len([]rune(name)) > maxCategoryNameLength {
+		fields["name"] = "name must not exceed 100 characters"
 	}
+	if len(fields) > 0 {
+		return models.CategorySummary{}, &CategoryValidationError{Fields: fields}
+	}
+
 	cat := &models.Category{Name: name}
-	err := s.categoryRepo.Create(cat)
+	if err := s.categoryRepo.Create(ctx, cat); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return models.CategorySummary{}, ErrCategoryExists
+		}
+		return models.CategorySummary{}, err
+	}
+	return models.CategorySummary{ID: cat.ID, Name: cat.Name}, nil
+}
+
+func (s *categoryService) GetCategories(ctx context.Context) ([]models.CategorySummary, error) {
+	categories, err := s.categoryRepo.FindAll(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return cat, nil
+	summaries := make([]models.CategorySummary, 0, len(categories))
+	for _, category := range categories {
+		summaries = append(summaries, models.CategorySummary{ID: category.ID, Name: category.Name})
+	}
+	return summaries, nil
 }
 
-// Get all the categiories from the repository
-func (s *categoryService) GetCategories() ([]models.Category, error) {
-	return s.categoryRepo.FindAll()
-
-}
-
-// Get one category by ID from the repository
-func (s *categoryService) GetCategoryByID(id uint) (*models.Category, error) {
-	return s.categoryRepo.FindByID(id)
-
+func (s *categoryService) GetCategoryByID(ctx context.Context, id uint) (models.CategoryDetails, error) {
+	if id == 0 {
+		return models.CategoryDetails{}, ErrCategoryNotFound
+	}
+	category, err := s.categoryRepo.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.CategoryDetails{}, ErrCategoryNotFound
+	}
+	if err != nil {
+		return models.CategoryDetails{}, err
+	}
+	items, err := s.categoryRepo.FindPublicMenuItems(ctx, category.ID)
+	if err != nil {
+		return models.CategoryDetails{}, err
+	}
+	if items == nil {
+		items = []models.CategoryMenuItem{}
+	}
+	return models.CategoryDetails{
+		ID:        category.ID,
+		Name:      category.Name,
+		MenuItems: items,
+	}, nil
 }

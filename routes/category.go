@@ -19,7 +19,7 @@ func CategoryRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
 	// public routes: GET /categories
-	router.HandleFunc("/categories", categoryHandler.GetGategories).Methods(http.MethodGet)
+	router.HandleFunc("/categories", categoryHandler.GetCategories).Methods(http.MethodGet)
 	router.HandleFunc("/categories/{id}", categoryHandler.GetCategory).Methods(http.MethodGet)
 
 	manager := protected(router, tokens)
