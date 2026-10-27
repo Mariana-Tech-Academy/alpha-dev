@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"alpha-dev/auth"
 	"alpha-dev/handlers"
 	"alpha-dev/middleware"
@@ -20,6 +22,7 @@ func OrderRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	// customer routes: POST /orders (checkout)
 	customer := protected(router, tokens)
 	customer.Use(middleware.RequireRole(models.RoleCustomer))
+	customer.HandleFunc("/orders", orderHandler.PlaceOrder).Methods(http.MethodPost)
 
 	// authenticated routes: GET /orders, GET /orders/{id}
 	// The service scopes results by role: own orders, own restaurant's orders, or all for admin.
@@ -29,5 +32,5 @@ func OrderRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	staff := protected(router, tokens)
 	staff.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
-	_, _, _, _ = orderHandler, customer, authed, staff
+	_, _, _ = customer, authed, staff
 }
