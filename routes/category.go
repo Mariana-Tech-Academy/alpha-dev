@@ -7,6 +7,7 @@ import (
 	"alpha-dev/models"
 	"alpha-dev/repository"
 	"alpha-dev/service"
+	"net/http"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -18,10 +19,11 @@ func CategoryRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
 	// public routes: GET /categories
+	router.HandleFunc("/categories", categoryHandler.GetCategories).Methods(http.MethodGet)
+	router.HandleFunc("/categories/{id}", categoryHandler.GetCategory).Methods(http.MethodGet)
 
-	// admin routes: POST /categories, PUT /categories/{id}, DELETE /categories/{id}
-	admin := protected(router, tokens)
-	admin.Use(middleware.RequireRole(models.RoleAdmin))
+	manager := protected(router, tokens)
+	manager.Use(middleware.RequireRole(models.RoleManager))
 
-	_, _ = categoryHandler, admin
+	manager.HandleFunc("/categories", categoryHandler.CreateCategory).Methods(http.MethodPost)
 }
