@@ -1,3 +1,36 @@
+// EPIC 6 - CHK-03: ORDER REPOSITORY - FILE 3:
+
+// PURPOSE:
+// Handles order placement and database operations using GORM and PostgreSQL.
+
+// IMPLEMENTATION:
+// 1. Retrieves the authenticated customer's shopping cart.
+// 2. Checks that the cart contains items.
+// 3. Verifies that the restaurant is active.
+// 4. Checks that all menu items are available.
+// 5. Calculates the order subtotal and prepares the order items.
+// 6. Generates an order reference and sets the order status to Pending.
+// 7. Saves the order and its items to PostgreSQL.
+// 8. Clears the customer's cart after successful checkout.
+
+// DATABASE TRANSACTION:
+// All checkout database operations run inside a GORM transaction.
+// If an operation returns an error, the transaction is rolled back.
+// This prevents partially completed checkout operations.
+
+// HOW IT WORKS:
+// The service calls OrderRepository.PlaceOrder.
+// The repository validates the cart, restaurant and menu items.
+// It calculates the order totals and creates the order.
+// Once the order is saved, the cart items are removed.
+// The completed order is returned to the service.
+
+// I implemented the checkout logic in the repository using GORM.
+// The repository retrieves the customer's cart, validates the restaurant
+// and menu items, calculates the total and creates an order with
+// Pending status. I used a database transaction so that order creation
+// and cart clearing are treated as one operation.
+
 package repository
 
 import (
