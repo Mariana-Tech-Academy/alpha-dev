@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// Use a fake repository so these tests do not need PostgreSQL.
 type fakeMenuRepo struct {
 	restaurant models.Restaurant
 	findRest   error
@@ -31,6 +32,12 @@ func (f *fakeMenuRepo) CreateMenuItem(_ context.Context, item *models.MenuItem) 
 	return nil
 }
 
+// Support menu reading in the fake repository.
+func (f *fakeMenuRepo) FindMenuByRestaurant(context.Context, uint, uint) ([]models.MenuItem, error) {
+	return []models.MenuItem{}, nil
+}
+
+// Start each creation test with valid details.
 func validMenuRequest() CreateMenuItemRequest {
 	return CreateMenuItemRequest{
 		RestaurantID: 3,
@@ -41,8 +48,12 @@ func validMenuRequest() CreateMenuItemRequest {
 	}
 }
 
+// Keep the team's existing menu creation tests.
 func TestCreateMenuItem(t *testing.T) {
-	active := models.Restaurant{ManagerID: 4, Status: models.RestaurantStatusActive}
+	active := models.Restaurant{
+		ManagerID: 4,
+		Status:    models.RestaurantStatusActive,
+	}
 
 	t.Run("creates an available item", func(t *testing.T) {
 		repo := &fakeMenuRepo{restaurant: active}
@@ -102,7 +113,10 @@ func TestCreateMenuItem(t *testing.T) {
 	})
 
 	t.Run("missing category", func(t *testing.T) {
-		_, err := NewMenuService(&fakeMenuRepo{restaurant: active, findCat: gorm.ErrRecordNotFound}).CreateMenuItem(context.Background(), 4, validMenuRequest())
+		_, err := NewMenuService(&fakeMenuRepo{
+			restaurant: active,
+			findCat:    gorm.ErrRecordNotFound,
+		}).CreateMenuItem(context.Background(), 4, validMenuRequest())
 		if !errors.Is(err, ErrCategoryNotFound) {
 			t.Fatalf("expected ErrCategoryNotFound, got %v", err)
 		}
