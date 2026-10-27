@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"alpha-dev/models"
+	"alpha-dev/repository"
 
 	"gorm.io/gorm"
 )
@@ -26,6 +27,9 @@ type fakeMenuRepo struct {
 	savedID          uint
 	deletedID        uint
 	didDelete        bool
+	searchQuery      repository.MenuSearchQuery
+	searchErr        error
+	searchResults    []models.MenuSearchResult
 }
 
 func (f *fakeMenuRepo) FindRestaurantByID(context.Context, uint) (models.Restaurant, error) {
@@ -67,6 +71,17 @@ func (f *fakeMenuRepo) DeleteMenuItem(_ context.Context, id uint) error {
 	f.deletedID = id
 	f.didDelete = true
 	return nil
+}
+
+func (f *fakeMenuRepo) SearchMenuItems(_ context.Context, q repository.MenuSearchQuery) ([]models.MenuSearchResult, error) {
+	f.searchQuery = q
+	if f.searchErr != nil {
+		return nil, f.searchErr
+	}
+	if f.searchResults == nil {
+		return []models.MenuSearchResult{}, nil
+	}
+	return f.searchResults, nil
 }
 
 func validMenuRequest() CreateMenuItemRequest {
@@ -389,6 +404,57 @@ func TestDeleteMenuItem(t *testing.T) {
 		}
 		if repo.didDelete {
 			t.Fatal("item was deleted")
+		}
+	})
+}
+
+func TestSearchMenuItems(t *testing.T) {
+	t.Run("trims the query and searches available items", func(t *testing.T) {
+		repo := &fakeMenuRepo{}
+		items, err := NewMenuService(repo).SearchMenuItems(context.Background(), MenuSearch{
+			Query: "  pi%zza_\\  ",
+			Page:  0,
+			Limit: 100,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if items == nil {
+			t.Fatal("expected an empty slice")
+		}
+		if repo.searchQuery.Query != `pi\%zza\_\\` || !repo.searchQuery.Available {
+			t.Fatalf("query = %#v", repo.searchQuery)
+		}
+		if repo.searchQuery.Limit != 20 || repo.searchQuery.Offset != 0 {
+			t.Fatalf("limit = %d offset = %d", repo.searchQuery.Limit, repo.searchQuery.Offset)
+		}
+	})
+
+	t.Run("negative price", func(t *testing.T) {
+		price := int64(-1)
+		_, err := NewMenuService(&fakeMenuRepo{}).SearchMenuItems(context.Background(), MenuSearch{MinPrice: &price})
+		if !errors.Is(err, ErrInvalidPriceBound) {
+			t.Fatalf("expected ErrInvalidPriceBound, got %v", err)
+		}
+	})
+
+	t.Run("min price above max price", func(t *testing.T) {
+		minPrice := int64(500)
+		maxPrice := int64(100)
+		_, err := NewMenuService(&fakeMenuRepo{}).SearchMenuItems(context.Background(), MenuSearch{
+			MinPrice: &minPrice,
+			MaxPrice: &maxPrice,
+		})
+		if !errors.Is(err, ErrInvalidPriceRange) {
+			t.Fatalf("expected ErrInvalidPriceRange, got %v", err)
+		}
+	})
+
+	t.Run("category id zero", func(t *testing.T) {
+		id := uint(0)
+		_, err := NewMenuService(&fakeMenuRepo{}).SearchMenuItems(context.Background(), MenuSearch{CategoryID: &id})
+		if !errors.Is(err, ErrInvalidCategoryID) {
+			t.Fatalf("expected ErrInvalidCategoryID, got %v", err)
 		}
 	})
 }

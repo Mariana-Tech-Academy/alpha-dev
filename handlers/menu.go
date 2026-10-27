@@ -140,3 +140,89 @@ func (h *MenuHandler) GetMenuItemDetails(w http.ResponseWriter, r *http.Request)
 
 	utils.Success(w, http.StatusOK, "menu item retrieved", item)
 }
+
+func (h *MenuHandler) SearchMenuItems(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	search := service.MenuSearch{Query: params.Get("q")}
+
+	var err error
+	if search.CategoryID, err = parseUintParam(params.Get("category_id")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "category_id must be a positive number")
+		return
+	}
+	if search.RestaurantID, err = parseUintParam(params.Get("restaurant_id")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "restaurant_id must be a positive number")
+		return
+	}
+	if search.MinPrice, err = parseInt64Param(params.Get("min_price")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "min_price must be a number")
+		return
+	}
+	if search.MaxPrice, err = parseInt64Param(params.Get("max_price")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "max_price must be a number")
+		return
+	}
+	if raw := params.Get("available"); raw != "" {
+		available, err := strconv.ParseBool(raw)
+		if err != nil {
+			utils.Error(w, http.StatusBadRequest, "available must be true or false")
+			return
+		}
+		search.Available = &available
+	}
+	if search.Page, err = parseQueryInt(params.Get("page")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "page must be a number")
+		return
+	}
+	if search.Limit, err = parseQueryInt(params.Get("limit")); err != nil {
+		utils.Error(w, http.StatusBadRequest, "limit must be a number")
+		return
+	}
+
+	items, err := h.MenuService.SearchMenuItems(r.Context(), search)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidCategoryID),
+			errors.Is(err, service.ErrInvalidRestaurantID),
+			errors.Is(err, service.ErrInvalidPriceBound),
+			errors.Is(err, service.ErrInvalidPriceRange):
+			utils.Error(w, http.StatusBadRequest, err.Error())
+		default:
+			log.Printf("search menu: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to search menu items")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "menu items retrieved", items)
+}
+
+func parseUintParam(value string) (*uint, error) {
+	if value == "" {
+		return nil, nil
+	}
+	n, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || n == 0 {
+		return nil, errors.New("must be a positive number")
+	}
+	id := uint(n)
+	return &id, nil
+}
+
+func parseInt64Param(value string) (*int64, error) {
+	if value == "" {
+		return nil, nil
+	}
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &n, nil
+}
+
+func parseQueryInt(value string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	return strconv.Atoi(value)
+}

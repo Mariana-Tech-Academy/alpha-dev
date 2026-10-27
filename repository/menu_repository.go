@@ -16,6 +16,19 @@ type MenuRepository interface {
 	UpdateMenuItemAvailability(ctx context.Context, id uint, available bool) error
 	UpdateMenuItem(ctx context.Context, id uint, fields map[string]any) error
 	DeleteMenuItem(ctx context.Context, id uint) error
+	SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, error)
+}
+
+// MenuSearchQuery is a normalized menu search. Query is already escaped for ILIKE.
+type MenuSearchQuery struct {
+	Query        string
+	CategoryID   *uint
+	RestaurantID *uint
+	MinPrice     *int64
+	MaxPrice     *int64
+	Available    bool
+	Limit        int
+	Offset       int
 }
 
 type PostgresMenuRepo struct {
@@ -63,4 +76,35 @@ func (repo *PostgresMenuRepo) UpdateMenuItemAvailability(ctx context.Context, id
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (repo *PostgresMenuRepo) SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, error) {
+	items := make([]models.MenuSearchResult, 0)
+	query := repo.db.WithContext(ctx).
+		Model(&models.MenuItem{}).
+		Select("menu_items.id, menu_items.name, menu_items.description, menu_items.price, menu_items.image_url, categories.name AS category, menu_items.restaurant_id, restaurants.name AS restaurant_name").
+		Joins("JOIN restaurants ON restaurants.id = menu_items.restaurant_id AND restaurants.deleted_at IS NULL").
+		Joins("LEFT JOIN categories ON categories.id = menu_items.category_id AND categories.deleted_at IS NULL").
+		Where("restaurants.status = ?", models.RestaurantStatusActive).
+		Where("menu_items.available = ?", q.Available)
+	if q.Query != "" {
+		query = query.Where("menu_items.name ILIKE ?", "%"+q.Query+"%")
+	}
+	if q.CategoryID != nil {
+		query = query.Where("menu_items.category_id = ?", *q.CategoryID)
+	}
+	if q.RestaurantID != nil {
+		query = query.Where("menu_items.restaurant_id = ?", *q.RestaurantID)
+	}
+	if q.MinPrice != nil {
+		query = query.Where("menu_items.price >= ?", *q.MinPrice)
+	}
+	if q.MaxPrice != nil {
+		query = query.Where("menu_items.price <= ?", *q.MaxPrice)
+	}
+	err := query.Order("menu_items.name ASC, menu_items.id ASC").
+		Limit(q.Limit).
+		Offset(q.Offset).
+		Scan(&items).Error
+	return items, err
 }
