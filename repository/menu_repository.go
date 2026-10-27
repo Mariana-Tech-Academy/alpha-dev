@@ -42,7 +42,10 @@ func (repo *PostgresMenuRepo) CreateMenuItem(ctx context.Context, item *models.M
 
 func (repo *PostgresMenuRepo) FindMenuItemByID(ctx context.Context, id uint) (models.MenuItem, error) {
 	var item models.MenuItem
-	err := repo.db.WithContext(ctx).First(&item, id).Error
+	err := repo.db.WithContext(ctx).
+		Preload("Restaurant").
+		Preload("Category").
+		First(&item, id).Error
 	return item, err
 }
 

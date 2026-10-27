@@ -214,3 +214,51 @@ func TestUpdateMenuItemAvailability(t *testing.T) {
 		}
 	})
 }
+
+func TestGetMenuItemDetails(t *testing.T) {
+	item := models.MenuItem{
+		Name:        "Margherita",
+		Description: "tomato",
+		Price:       1250,
+		ImageURL:    "pizza.jpg",
+		Available:   true,
+		Restaurant:  models.Restaurant{Status: models.RestaurantStatusActive},
+		Category:    models.Category{Name: "Pizza"},
+	}
+	item.ID = 9
+
+	t.Run("visible item", func(t *testing.T) {
+		got, err := NewMenuService(&fakeMenuRepo{item: item}).GetMenuItemDetails(context.Background(), 9)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.ID != 9 || got.Name != "Margherita" || got.Price != 1250 || got.Category != "Pizza" || got.ImageURL != "pizza.jpg" {
+			t.Fatalf("item = %+v", got)
+		}
+	})
+
+	t.Run("missing item", func(t *testing.T) {
+		_, err := NewMenuService(&fakeMenuRepo{findItemErr: gorm.ErrRecordNotFound}).GetMenuItemDetails(context.Background(), 9)
+		if !errors.Is(err, ErrMenuItemNotFound) {
+			t.Fatalf("expected ErrMenuItemNotFound, got %v", err)
+		}
+	})
+
+	t.Run("unavailable item", func(t *testing.T) {
+		hidden := item
+		hidden.Available = false
+		_, err := NewMenuService(&fakeMenuRepo{item: hidden}).GetMenuItemDetails(context.Background(), 9)
+		if !errors.Is(err, ErrMenuItemNotFound) {
+			t.Fatalf("expected ErrMenuItemNotFound, got %v", err)
+		}
+	})
+
+	t.Run("restaurant is not active", func(t *testing.T) {
+		hidden := item
+		hidden.Restaurant.Status = models.RestaurantStatusPending
+		_, err := NewMenuService(&fakeMenuRepo{item: hidden}).GetMenuItemDetails(context.Background(), 9)
+		if !errors.Is(err, ErrMenuItemNotFound) {
+			t.Fatalf("expected ErrMenuItemNotFound, got %v", err)
+		}
+	})
+}

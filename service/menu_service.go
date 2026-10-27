@@ -36,6 +36,7 @@ type CreateMenuItemRequest struct {
 type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
 	UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error)
+	GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error)
 }
 
 type menuService struct {
@@ -129,4 +130,26 @@ func (s *menuService) UpdateMenuItemAvailability(ctx context.Context, userID uin
 
 	item.Available = available
 	return &item, nil
+}
+
+func (s *menuService) GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error) {
+	item, err := s.menuRepo.FindMenuItemByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.PublicMenuItem{}, ErrMenuItemNotFound
+	}
+	if err != nil {
+		return models.PublicMenuItem{}, err
+	}
+	if !item.Available || item.Restaurant.Status != models.RestaurantStatusActive {
+		return models.PublicMenuItem{}, ErrMenuItemNotFound
+	}
+
+	return models.PublicMenuItem{
+		ID:          item.ID,
+		Name:        item.Name,
+		Description: item.Description,
+		Price:       item.Price,
+		ImageURL:    item.ImageURL,
+		Category:    item.Category.Name,
+	}, nil
 }

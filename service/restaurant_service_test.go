@@ -17,6 +17,10 @@ type fakeRestaurantRepo struct {
 	found   models.Restaurant
 	findErr error
 	updates map[string]any
+	list    []models.Restaurant
+	listErr error
+	page    int
+	limit   int
 }
 
 func (f *fakeRestaurantRepo) Create(_ context.Context, restaurant *models.Restaurant) error {
@@ -46,6 +50,15 @@ func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, mod
 func (f *fakeRestaurantRepo) UpdateFields(_ context.Context, _ uint, fields map[string]any) error {
 	f.updates = fields
 	return nil
+}
+
+func (f *fakeRestaurantRepo) GetActiveRestaurants(_ context.Context, page, limit int) ([]models.Restaurant, error) {
+	f.page = page
+	f.limit = limit
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return f.list, nil
 }
 
 func validRestaurant() *models.Restaurant {
@@ -229,6 +242,37 @@ func TestUpdateRestaurant(t *testing.T) {
 		})
 		if !errors.Is(err, ErrInvalidImage) {
 			t.Fatalf("expected ErrInvalidImage, got %v", err)
+		}
+	})
+}
+
+func TestListActiveRestaurants(t *testing.T) {
+	first := ownedRestaurant()
+	second := ownedRestaurant()
+	second.ID = 8
+	second.Name = "Noodle Bar"
+
+	t.Run("returns a page of active restaurants", func(t *testing.T) {
+		repo := &fakeRestaurantRepo{list: []models.Restaurant{first, second}}
+		profiles, err := NewRestaurantService(repo).ListActiveRestaurants(context.Background(), 0, 100)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.page != 1 || repo.limit != 20 {
+			t.Fatalf("page = %d limit = %d", repo.page, repo.limit)
+		}
+		if len(profiles) != 2 || profiles[0].Name != "Pizza Place" || profiles[1].ID != 8 {
+			t.Fatalf("profiles = %+v", profiles)
+		}
+	})
+
+	t.Run("empty page", func(t *testing.T) {
+		profiles, err := NewRestaurantService(&fakeRestaurantRepo{}).ListActiveRestaurants(context.Background(), 2, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if profiles == nil || len(profiles) != 0 {
+			t.Fatalf("profiles = %#v", profiles)
 		}
 	})
 }
