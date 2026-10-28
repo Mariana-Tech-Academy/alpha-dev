@@ -1,15 +1,18 @@
 package service
 
 import (
-	"alpha-dev/repository"
 	"alpha-dev/models"
-	"context"	
+	"alpha-dev/repository"
+	"context"
 	"errors"
+	"strings"
+
 	"gorm.io/gorm"
 )
 
 type RestaurantService interface {
 	GetRestaurantDetails(ctx context.Context, id uint) (models.Restaurant, error)
+	SearchRestaurants(ctx context.Context, query string) ([]models.Restaurant, error)
 }
 
 type restaurantService struct {
@@ -30,4 +33,19 @@ func (s *restaurantService) GetRestaurantDetails(ctx context.Context, id uint) (
         return models.Restaurant{}, err
     }
     return restaurant, nil
+}
+
+func (s *restaurantService) SearchRestaurants(ctx context.Context, query string) ([]models.Restaurant, error) {
+	//Trim whitespace from the user's input
+	trimmedQuery := strings.TrimSpace(query)
+
+	// Return an empty slice immediately if query is empty, instead of executing an unnecessary database query.
+	if trimmedQuery == "" {
+		return []models.Restaurant{}, nil
+	}
+
+	// Prepare the search pattern for the repository
+	pattern := "%" + trimmedQuery + "%"
+
+	return s.restaurantRepo.SearchActiveByNameOrLocation(ctx, pattern)
 }

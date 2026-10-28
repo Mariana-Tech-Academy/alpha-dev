@@ -1,11 +1,13 @@
 package handlers
 
 import (
-    "net/http"
-    "strconv"
-    "alpha-dev/service"
-    "alpha-dev/utils"
-    "github.com/gorilla/mux"
+	"alpha-dev/service"
+	"alpha-dev/utils"
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 type RestaurantHandler struct {
@@ -36,4 +38,22 @@ func (h *RestaurantHandler) GetRestaurantDetails(w http.ResponseWriter, r *http.
     }
     // Return the restaurant details in the response
     utils.Success(w, http.StatusOK, "Restaurant retrieved successfully", restaurant)
+}
+
+func (h *RestaurantHandler) SearchRestaurants(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract query parameter from URL: e.g. /api/restaurants/search?q=London or ?q=Pizza
+	req := r.URL.Query().Get("q")
+
+	restaurants, err := h.restaurantService.SearchRestaurants(r.Context(), req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to fetch search results"})
+		return
+	}
+
+	// Always returns 200 OK with [] if empty, or populated list if matches exist
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(restaurants)
 }
