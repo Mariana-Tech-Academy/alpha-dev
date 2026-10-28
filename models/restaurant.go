@@ -30,3 +30,67 @@ type Restaurant struct {
 	MenuItems []MenuItem `json:"menu_items,omitempty"`
 	Orders    []Order    `json:"orders,omitempty"`
 }
+
+// RestaurantProfile is the public view of a restaurant returned by the API.
+type RestaurantProfile struct {
+	ID          uint             `json:"id"`
+	ManagerID   uint             `json:"manager_id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Address     string           `json:"address"`
+	City        string           `json:"city,omitempty"`
+	State       string           `json:"state,omitempty"`
+	Phone       string           `json:"phone"`
+	Email       string           `json:"email"`
+	OpeningTime string           `json:"opening_time"`
+	ClosingTime string           `json:"closing_time"`
+	ImageURL    string           `json:"image_url,omitempty"`
+	Status      RestaurantStatus `json:"status"`
+}
+
+func (r *Restaurant) Profile() RestaurantProfile {
+	return RestaurantProfile{
+		ID:          r.ID,
+		ManagerID:   r.ManagerID,
+		Name:        r.Name,
+		Description: r.Description,
+		Address:     r.Address,
+		City:        r.City,
+		State:       r.State,
+		Phone:       r.Phone,
+		Email:       r.Email,
+		OpeningTime: r.OpeningTime,
+		ClosingTime: r.ClosingTime,
+		ImageURL:    r.ImageURL,
+		Status:      r.Status,
+	}
+}
+
+// PublicMenuItem is a customer-facing menu row.
+type PublicMenuItem struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Price       int64  `json:"price"`
+	ImageURL    string `json:"image_url,omitempty"`
+	Category    string `json:"category"`
+}
+
+// RestaurantDetails is the public restaurant page, including available menu items.
+type RestaurantDetails struct {
+	RestaurantProfile
+	MenuItems []PublicMenuItem `json:"menu_items"`
+}
+
+type UpdateRestaurantInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Address     *string `json:"address"`
+	City        *string `json:"city"`
+	State       *string `json:"state"`
+	Phone       *string `json:"phone"`
+	Email       *string `json:"email"`
+	OpeningTime *string `json:"opening_time"`
+	ClosingTime *string `json:"closing_time"`
+	ImageURL    *string `json:"image_url"`
+}

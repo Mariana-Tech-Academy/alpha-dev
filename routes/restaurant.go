@@ -1,13 +1,15 @@
 package routes
 
 import (
+	"net/http"
+
 	"alpha-dev/auth"
 	"alpha-dev/handlers"
 	"alpha-dev/middleware"
 	"alpha-dev/models"
 	"alpha-dev/repository"
 	"alpha-dev/service"
-	"net/http"
+	
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
@@ -18,6 +20,7 @@ func RestaurantRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) 
 	restaurantHandler := handlers.NewRestaurantHandler(restaurantService)
 
 	// public routes: GET /restaurants, GET /restaurants/{id}
+	router.HandleFunc("/restaurants", restaurantHandler.ListActiveRestaurants).Methods(http.MethodGet)
 	router.HandleFunc("/restaurants/search", restaurantHandler.SearchRestaurants).Methods(http.MethodGet)
 	router.HandleFunc("/restaurants/{id}", restaurantHandler.GetRestaurantDetails).Methods(http.MethodGet)
 	// manager routes: POST /restaurants, PUT /restaurants/{id}, PATCH /restaurants/{id}/status
@@ -25,5 +28,7 @@ func RestaurantRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) 
 	manager := protected(router, tokens)
 	manager.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
-	_, _ = restaurantHandler, manager
+	manager.HandleFunc("/restaurants", restaurantHandler.RegisterRestaurant).Methods(http.MethodPost)
+	manager.HandleFunc("/restaurants/{id}", restaurantHandler.UpdateRestaurant).Methods(http.MethodPut)
+	manager.HandleFunc("/restaurants/{id}/status", restaurantHandler.SetAvailability).Methods(http.MethodPatch)
 }

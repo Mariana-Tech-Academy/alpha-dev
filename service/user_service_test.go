@@ -99,6 +99,15 @@ func (f *fakeUserRepo) UpdatePassword(_ context.Context, id uint, hash string) e
 	return nil
 }
 
+func (f *fakeUserRepo) UpdateProfile(_ context.Context, id uint, firstName, lastName, email, phone string) error {
+	f.found.ID = id
+	f.found.FirstName = firstName
+	f.found.LastName = lastName
+	f.found.Email = email
+	f.found.Phone = phone
+	return nil
+}
+
 func TestRegister(t *testing.T) {
 	t.Run("creates active customer with hashed password", func(t *testing.T) {
 		repo := &fakeUserRepo{}
@@ -237,4 +246,59 @@ func TestGetActiveUser(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateUserProfile(t *testing.T) {
+	active := models.User{
+		FirstName: "Ada",
+		LastName:  "Lovelace",
+		Email:     "ada@example.com",
+		Phone:     "+447700900123",
+		Status:    models.UserStatusActive,
+	}
+	active.ID = 1
+
+	t.Run("updates name and lowercases email", func(t *testing.T) {
+		repo := &fakeUserRepo{found: active}
+		user, err := NewUserService(repo, nil).UpdateUserProfile(context.Background(), 1, UpdateProfileRequest{
+			FirstName: "  Augusta  ",
+			LastName:  "King",
+			Email:     "  ADA@Example.com ",
+			Phone:     "+44 7700 900123",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if user.FirstName != "Augusta" || user.Email != "ada@example.com" {
+			t.Fatalf("profile = %+v", user.Profile())
+		}
+	})
+
+	t.Run("empty first name", func(t *testing.T) {
+		_, err := NewUserService(&fakeUserRepo{found: active}, nil).UpdateUserProfile(context.Background(), 1, UpdateProfileRequest{
+			FirstName: " ",
+			LastName:  "King",
+			Email:     "ada@example.com",
+			Phone:     "+447700900123",
+		})
+		var validationErr *ProfileValidationError
+		if !errors.As(err, &validationErr) {
+			t.Fatalf("expected validation error, got %v", err)
+		}
+		if _, ok := validationErr.Fields["first_name"]; !ok {
+			t.Fatalf("fields = %v", validationErr.Fields)
+		}
+	})
+
+	t.Run("email taken", func(t *testing.T) {
+		_, err := NewUserService(&fakeUserRepo{found: active, emailExists: true}, nil).UpdateUserProfile(context.Background(), 1, UpdateProfileRequest{
+			FirstName: "Ada",
+			LastName:  "Lovelace",
+			Email:     "other@example.com",
+			Phone:     "+447700900123",
+		})
+		if !errors.Is(err, ErrEmailTaken) {
+			t.Fatalf("expected ErrEmailTaken, got %v", err)
+		}
+	})
 }
