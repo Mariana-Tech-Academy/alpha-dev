@@ -15,3 +15,15 @@ type MenuItem struct {
 	ImageURL     string     `json:"image_url"`
 	Available    bool       `gorm:"not null;default:true;index" json:"available"`
 }
+
+// MenuSearchResult is a public menu row returned by search.
+type MenuSearchResult struct {
+	ID             uint   `json:"id"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	Price          int64  `json:"price"`
+	ImageURL       string `json:"image_url,omitempty"`
+	Category       string `json:"category"`
+	RestaurantID   uint   `json:"restaurant_id"`
+	RestaurantName string `json:"restaurant_name"`
+}
