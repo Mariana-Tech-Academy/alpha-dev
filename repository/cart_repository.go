@@ -17,8 +17,11 @@ type CartRepository interface {
 		menuItemID uint,
 		restaurantID uint,
 		quantity int,
+		price int64,
 	) (*models.CartItem, error)
 }
+
+const MaxCartLineQuantity = 99
 
 type PostgresCartRepo struct {
 	db *gorm.DB
@@ -28,8 +31,9 @@ func NewCartRepository(db *gorm.DB) CartRepository {
 	return &PostgresCartRepo{db: db}
 }
 
-var ErrDifferentRestaurant = errors.New(
-	"cart contains items from another restaurant",
+var (
+	ErrDifferentRestaurant = errors.New("cart contains items from another restaurant")
+	ErrCartLineFull        = errors.New("quantity cannot exceed 99")
 )
 
 func (r *PostgresCartRepo) AddItem(
@@ -38,6 +42,7 @@ func (r *PostgresCartRepo) AddItem(
 	menuItemID uint,
 	restaurantID uint,
 	quantity int,
+	price int64,
 ) (*models.CartItem, error) {
 
 	var result models.CartItem
@@ -90,13 +95,16 @@ func (r *PostgresCartRepo) AddItem(
 		).First(&existing).Error
 
 		if err == nil {
-			// Increase quantity without creating a duplicate.
-			existing.Quantity += quantity
-
-			if err := tx.Save(&existing).Error; err != nil {
+			next := existing.Quantity + quantity
+			if next > MaxCartLineQuantity {
+				return ErrCartLineFull
+			}
+			if err := tx.Model(&models.CartItem{}).
+				Where("id = ?", existing.ID).
+				Update("quantity", next).Error; err != nil {
 				return err
 			}
-
+			existing.Quantity = next
 			result = existing
 			return nil
 		}
@@ -105,11 +113,15 @@ func (r *PostgresCartRepo) AddItem(
 			return err
 		}
 
-		// Add a new item to the cart.
+		if quantity > MaxCartLineQuantity {
+			return ErrCartLineFull
+		}
+
 		item := models.CartItem{
 			CartID:     cart.ID,
 			MenuItemID: menuItemID,
 			Quantity:   quantity,
+			Price:      price,
 		}
 
 		if err := tx.Create(&item).Error; err != nil {

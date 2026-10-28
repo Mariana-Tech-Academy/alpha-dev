@@ -33,4 +33,5 @@ type CartItem struct {
 	MenuItemID uint     `gorm:"not null;uniqueIndex:idx_cart_menu_item,where:deleted_at IS NULL" json:"menu_item_id"`
 	MenuItem   MenuItem `json:"menu_item"`
 	Quantity   int      `gorm:"not null;check:quantity > 0" json:"quantity"`
+	Price      int64    `gorm:"not null;default:0" json:"price"`
 }

@@ -15,7 +15,8 @@ import (
 
 func CartRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	cartRepo := repository.NewCartRepository(db)
-	cartService := service.NewCartService(cartRepo, db)
+	menuRepo := repository.NewMenuRepository(db)
+	cartService := service.NewCartService(cartRepo, menuRepo)
 	cartHandler := handlers.NewCartHandler(cartService)
 
 	// customer routes: GET /cart, POST /cart/items, PUT /cart/items/{id}, DELETE /cart/items/{id}, DELETE /cart
