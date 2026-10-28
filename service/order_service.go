@@ -22,32 +22,32 @@
 package service
 
 import (
-    "context"
+	"context"
 
-    "alpha-dev/models"
-    "alpha-dev/repository"
+	"alpha-dev/models"
+	"alpha-dev/repository"
 )
 
 type OrderService interface {
-    PlaceOrder(
-        ctx context.Context,
-        userID uint,
-        order *models.Order,
-    ) (*models.Order, error)
+	PlaceOrder(
+		ctx context.Context,
+		userID uint,
+		order *models.Order,
+	) (*models.Order, error)
 }
 
 type orderService struct {
-    orderRepo repository.OrderRepository
+	orderRepo repository.OrderRepository
 }
 
 func NewOrderService(repo repository.OrderRepository) OrderService {
-    return &orderService{orderRepo: repo}
+	return &orderService{orderRepo: repo}
 }
 func (s *orderService) PlaceOrder(
-    ctx context.Context,
-    userID uint,
-    order *models.Order,
+	ctx context.Context,
+	userID uint,
+	order *models.Order,
 ) (*models.Order, error) {
 
-    return s.orderRepo.PlaceOrder(ctx, userID, order)
+	return s.orderRepo.PlaceOrder(ctx, userID, order)
 }
