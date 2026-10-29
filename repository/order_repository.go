@@ -9,6 +9,7 @@ import (
 	"alpha-dev/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrderRepository interface {
@@ -32,93 +33,91 @@ var (
 func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error) {
 	var result *models.Order
 
-	// Wrap all in transaction for atomicity
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Step 1: Get cart with menu items
 		var cart models.Cart
-		if err := tx.Preload("Items.MenuItem").Where("user_id = ?", userID).First(&cart).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ?", userID).
+			First(&cart).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrEmptyCart
 			}
+			return err
+		}
+
+		if err := tx.Preload("MenuItem").Where("cart_id = ?", cart.ID).Find(&cart.Items).Error; err != nil {
 			return err
 		}
 		if len(cart.Items) == 0 || cart.RestaurantID == nil {
 			return ErrEmptyCart
 		}
 
-		// Step 2: Validate restaurant
 		var restaurant models.Restaurant
 		if err := tx.First(&restaurant, *cart.RestaurantID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrInactiveRestaurant
+			}
 			return err
 		}
 		if restaurant.Status != models.RestaurantStatusActive {
 			return ErrInactiveRestaurant
 		}
 
-		// Step 3: Validate items and calculate subtotal
+		orderItems := make([]models.OrderItem, 0, len(cart.Items))
 		var subtotal int64
-		for _, ci := range cart.Items {
-			if !ci.MenuItem.Available || ci.MenuItem.RestaurantID != *cart.RestaurantID {
+		for _, line := range cart.Items {
+			if line.MenuItem.ID == 0 || !line.MenuItem.Available || line.MenuItem.RestaurantID != *cart.RestaurantID {
 				return ErrUnavailableItem
 			}
-			subtotal += ci.MenuItem.Price * int64(ci.Quantity)
-		}
-
-		// Step 4: Build order item snapshots (so past orders never change)
-		orderItems := make([]models.OrderItem, 0, len(cart.Items))
-		for _, ci := range cart.Items {
+			lineTotal := line.Price * int64(line.Quantity)
+			subtotal += lineTotal
 			orderItems = append(orderItems, models.OrderItem{
-				MenuItemID: ci.MenuItemID,
-				Name:       ci.MenuItem.Name,
-				UnitPrice:  ci.MenuItem.Price,
-				Quantity:   ci.Quantity,
-				LineTotal:  ci.MenuItem.Price * int64(ci.Quantity),
+				MenuItemID: line.MenuItemID,
+				Name:       line.MenuItem.Name,
+				UnitPrice:  line.Price,
+				Quantity:   line.Quantity,
+				LineTotal:  lineTotal,
 			})
 		}
 
-		// Step 5: ORD-01 CORE - Generate unique ORD-YYYYMMDD-NNN atomically
-		// This is concurrency-safe: Postgres locks the row for order_date
 		var seq struct {
-			LastNumber int `gorm:"column:last_number"`
+			OrderDate  time.Time `gorm:"column:order_date"`
+			LastNumber int       `gorm:"column:last_number"`
 		}
 		if err := tx.Raw(`
 			INSERT INTO order_daily_sequences (order_date, last_number)
 			VALUES (CURRENT_DATE, 1)
-			ON CONFLICT (order_date) 
+			ON CONFLICT (order_date)
 			DO UPDATE SET last_number = order_daily_sequences.last_number + 1
-			RETURNING last_number
+			RETURNING order_date, last_number
 		`).Scan(&seq).Error; err != nil {
-			return fmt.Errorf("failed to generate order number: %w", err)
+			return err
+		}
+		if seq.LastNumber < 1 {
+			return errors.New("order number sequence did not advance")
 		}
 
-		// Format: ORD-YYYYMMDD-NNN -> e.g. ORD-20261028-001
-		order.OrderNumber = fmt.Sprintf("ORD-%s-%03d", time.Now().Format("20060102"), seq.LastNumber)
-
-		// Step 6: Fill remaining order fields
+		order.OrderNumber = fmt.Sprintf("ORD-%s-%03d", seq.OrderDate.UTC().Format("20060102"), seq.LastNumber)
 		order.CustomerID = userID
 		order.RestaurantID = *cart.RestaurantID
 		order.Status = models.OrderStatusPending
+		order.DeliveryFee = 0
 		order.Subtotal = subtotal
-		order.Total = subtotal + order.DeliveryFee
+		order.Total = subtotal
 		order.Items = orderItems
 
-		// Step 7: Save order to DB (uniqueIndex will catch any duplicate)
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
-
-		// Step 8: Clear cart after successful order
 		if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&cart).Update("restaurant_id", nil).Error; err != nil {
+		if err := tx.Model(&cart).Updates(map[string]any{"restaurant_id": nil}).Error; err != nil {
 			return err
 		}
 
 		result = order
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

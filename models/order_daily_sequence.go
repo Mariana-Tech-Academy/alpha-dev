@@ -2,9 +2,8 @@ package models
 
 import "time"
 
-// ORD-01: Daily counter for ORD-YYYYMMDD-NNN
-// This makes it safe when 2 orders are placed at same time
+// OrderDailySequence is the per-day counter behind ORD-YYYYMMDD-NNN.
 type OrderDailySequence struct {
-	OrderDate  time.Time `gorm:"type:date;primaryKey" json:"order_date"`
-	LastNumber int       `gorm:"not null" json:"last_number"`
+	OrderDate  time.Time `gorm:"type:date;primaryKey"`
+	LastNumber int       `gorm:"not null"`
 }
