@@ -220,6 +220,52 @@ func (h *RestaurantHandler) UpdateRestaurant(w http.ResponseWriter, r *http.Requ
 	utils.Success(w, http.StatusOK, "restaurant updated", updated.Profile())
 }
 
+func (h *RestaurantHandler) GetRestaurantDetails(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
+	if err != nil || id == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant ID")
+		return
+	}
+
+	restaurant, err := h.RestaurantService.GetRestaurantDetails(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, service.ErrRestaurantNotFound) {
+			utils.Error(w, http.StatusNotFound, "restaurant not found")
+			return
+		}
+		log.Printf("get restaurant %d: %v", id, err)
+		utils.Error(w, http.StatusInternalServerError, "unable to load restaurant")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurant retrieved", restaurant)
+}
+
+func (h *RestaurantHandler) ListActiveRestaurants(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	profiles, err := h.RestaurantService.ListActiveRestaurants(r.Context(), page, limit)
+	if err != nil {
+		log.Printf("list restaurants: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurants retrieved", profiles)
+}
+
 // formField returns the value when the multipart form included the key, including a blank value.
 func formField(r *http.Request, key string) *string {
 	if r.MultipartForm == nil {
@@ -231,4 +277,28 @@ func formField(r *http.Request, key string) *string {
 	}
 	value := values[0]
 	return &value
+}
+
+func (h *RestaurantHandler) SearchRestaurants(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	restaurants, err := h.RestaurantService.SearchRestaurants(r.Context(), r.URL.Query().Get("q"), page, limit)
+	if err != nil {
+		log.Printf("search restaurants: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurants retrieved", restaurants)
 }

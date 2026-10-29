@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"alpha-dev/models"
+
+	"gorm.io/gorm"
 )
 
 type fakeRestaurantRepo struct {
@@ -15,6 +17,12 @@ type fakeRestaurantRepo struct {
 	found   models.Restaurant
 	findErr error
 	updates map[string]any
+	list    []models.Restaurant
+	listErr error
+	page    int
+	limit   int
+	pattern string
+	offset  int
 }
 
 func (f *fakeRestaurantRepo) Create(_ context.Context, restaurant *models.Restaurant) error {
@@ -27,6 +35,16 @@ func (f *fakeRestaurantRepo) FindByID(context.Context, uint) (models.Restaurant,
 	return f.found, f.findErr
 }
 
+func (f *fakeRestaurantRepo) FindActiveByID(_ context.Context, id uint) (models.Restaurant, error) {
+	if f.findErr != nil {
+		return models.Restaurant{}, f.findErr
+	}
+	if f.found.ID != id || f.found.Status != models.RestaurantStatusActive {
+		return models.Restaurant{}, gorm.ErrRecordNotFound
+	}
+	return f.found, nil
+}
+
 func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, models.RestaurantStatus, models.RestaurantStatus) (bool, error) {
 	return false, nil
 }
@@ -34,6 +52,28 @@ func (f *fakeRestaurantRepo) UpdateAvailability(context.Context, uint, uint, mod
 func (f *fakeRestaurantRepo) UpdateFields(_ context.Context, _ uint, fields map[string]any) error {
 	f.updates = fields
 	return nil
+}
+
+func (f *fakeRestaurantRepo) SearchActiveByNameOrLocation(_ context.Context, pattern string, limit, offset int) ([]models.Restaurant, error) {
+	f.pattern = pattern
+	f.limit = limit
+	f.offset = offset
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	if f.list == nil {
+		return []models.Restaurant{}, nil
+	}
+	return f.list, nil
+}
+
+func (f *fakeRestaurantRepo) GetActiveRestaurants(_ context.Context, page, limit int) ([]models.Restaurant, error) {
+	f.page = page
+	f.limit = limit
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return f.list, nil
 }
 
 func validRestaurant() *models.Restaurant {
@@ -219,4 +259,100 @@ func TestUpdateRestaurant(t *testing.T) {
 			t.Fatalf("expected ErrInvalidImage, got %v", err)
 		}
 	})
+}
+
+func TestListActiveRestaurants(t *testing.T) {
+	first := ownedRestaurant()
+	second := ownedRestaurant()
+	second.ID = 8
+	second.Name = "Noodle Bar"
+
+	t.Run("returns a page of active restaurants", func(t *testing.T) {
+		repo := &fakeRestaurantRepo{list: []models.Restaurant{first, second}}
+		profiles, err := NewRestaurantService(repo).ListActiveRestaurants(context.Background(), 0, 100)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if repo.page != 1 || repo.limit != 20 {
+			t.Fatalf("page = %d limit = %d", repo.page, repo.limit)
+		}
+		if len(profiles) != 2 || profiles[0].Name != "Pizza Place" || profiles[1].ID != 8 {
+			t.Fatalf("profiles = %+v", profiles)
+		}
+	})
+
+	t.Run("empty page", func(t *testing.T) {
+		profiles, err := NewRestaurantService(&fakeRestaurantRepo{}).ListActiveRestaurants(context.Background(), 2, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if profiles == nil || len(profiles) != 0 {
+			t.Fatalf("profiles = %#v", profiles)
+		}
+	})
+}
+
+func TestGetRestaurantDetails(t *testing.T) {
+	available := models.MenuItem{Name: "Margherita", Description: "tomato", Price: 1250, Available: true}
+	available.ID = 9
+	available.Category.Name = "Pizza"
+	unavailable := models.MenuItem{Name: "Sold out", Available: false}
+	unavailable.ID = 10
+
+	active := ownedRestaurant()
+	active.MenuItems = []models.MenuItem{available, unavailable}
+
+	t.Run("returns an active restaurant and its available menu", func(t *testing.T) {
+		details, err := NewRestaurantService(&fakeRestaurantRepo{found: active}).GetRestaurantDetails(context.Background(), 3)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if details.ID != 3 || details.Name != "Pizza Place" || details.Status != models.RestaurantStatusActive {
+			t.Fatalf("details = %+v", details)
+		}
+		if len(details.MenuItems) != 1 || details.MenuItems[0].Name != "Margherita" || details.MenuItems[0].Category != "Pizza" {
+			t.Fatalf("menu = %+v", details.MenuItems)
+		}
+	})
+
+	t.Run("missing restaurant", func(t *testing.T) {
+		_, err := NewRestaurantService(&fakeRestaurantRepo{findErr: gorm.ErrRecordNotFound}).GetRestaurantDetails(context.Background(), 3)
+		if !errors.Is(err, ErrRestaurantNotFound) {
+			t.Fatalf("expected ErrRestaurantNotFound, got %v", err)
+		}
+	})
+
+	t.Run("inactive restaurant", func(t *testing.T) {
+		inactive := active
+		inactive.Status = models.RestaurantStatusInactive
+		_, err := NewRestaurantService(&fakeRestaurantRepo{found: inactive}).GetRestaurantDetails(context.Background(), 3)
+		if !errors.Is(err, ErrRestaurantNotFound) {
+			t.Fatalf("expected ErrRestaurantNotFound, got %v", err)
+		}
+	})
+}
+
+func TestSearchRestaurants(t *testing.T) {
+	repo := &fakeRestaurantRepo{list: []models.Restaurant{{
+		Name: "Lagos Kitchen", City: "Lagos", Status: models.RestaurantStatusActive,
+	}}}
+	repo.list[0].ID = 4
+	profiles, err := NewRestaurantService(repo).SearchRestaurants(context.Background(), "  la%gos_\\  ", 0, 100)
+	if err != nil {
+		t.Fatalf("search restaurants: %v", err)
+	}
+	if repo.pattern != `%la\%gos\_\\%` || repo.limit != 20 || repo.offset != 0 {
+		t.Fatalf("pattern %q limit %d offset %d", repo.pattern, repo.limit, repo.offset)
+	}
+	if len(profiles) != 1 || profiles[0].Name != "Lagos Kitchen" || profiles[0].ID != 4 {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+
+	empty, err := NewRestaurantService(&fakeRestaurantRepo{}).SearchRestaurants(context.Background(), "   ", 1, 10)
+	if err != nil {
+		t.Fatalf("empty query: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("empty query returned %+v", empty)
+	}
 }

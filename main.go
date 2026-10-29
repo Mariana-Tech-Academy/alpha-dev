@@ -51,6 +51,7 @@ func main() {
 		&models.Order{},
 		&models.OrderItem{},
 		&models.RevokedToken{},
+		&models.OrderDailySequence{},
 	)
 	if err != nil {
 		log.Fatal("failed to automigrate: ", err)

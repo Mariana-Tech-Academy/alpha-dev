@@ -11,6 +11,8 @@ import (
 type RestaurantRepository interface {
 	Create(ctx context.Context, restaurant *models.Restaurant) error
 	FindByID(ctx context.Context, id uint) (models.Restaurant, error)
+	FindActiveByID(ctx context.Context, id uint) (models.Restaurant, error)
+	SearchActiveByNameOrLocation(ctx context.Context, pattern string, limit, offset int) ([]models.Restaurant, error)
 	UpdateFields(ctx context.Context, id uint, fields map[string]any) error
 	UpdateAvailability(
 		ctx context.Context,
@@ -19,6 +21,7 @@ type RestaurantRepository interface {
 		currentStatus models.RestaurantStatus,
 		nextStatus models.RestaurantStatus,
 	) (bool, error)
+	GetActiveRestaurants(ctx context.Context, page, limit int) ([]models.Restaurant, error)
 }
 
 type PostgresRestaurantRepo struct {
@@ -36,6 +39,16 @@ func (repo *PostgresRestaurantRepo) Create(ctx context.Context, restaurant *mode
 func (repo *PostgresRestaurantRepo) FindByID(ctx context.Context, id uint) (models.Restaurant, error) {
 	var restaurant models.Restaurant
 	err := repo.db.WithContext(ctx).First(&restaurant, id).Error
+	return restaurant, err
+}
+
+func (repo *PostgresRestaurantRepo) FindActiveByID(ctx context.Context, id uint) (models.Restaurant, error) {
+	var restaurant models.Restaurant
+	err := repo.db.WithContext(ctx).
+		Where("status = ?", models.RestaurantStatusActive).
+		Preload("MenuItems", "available = ?", true).
+		Preload("MenuItems.Category").
+		First(&restaurant, id).Error
 	return restaurant, err
 }
 
@@ -64,4 +77,28 @@ func (repo *PostgresRestaurantRepo) UpdateAvailability(
 		Update("status", nextStatus)
 
 	return result.RowsAffected == 1, result.Error
+}
+
+func (repo *PostgresRestaurantRepo) GetActiveRestaurants(ctx context.Context, page, limit int) ([]models.Restaurant, error) {
+	var restaurants []models.Restaurant
+	offset := (page - 1) * limit
+	err := repo.db.WithContext(ctx).
+		Where("status = ?", models.RestaurantStatusActive).
+		Order("id").
+		Limit(limit).
+		Offset(offset).
+		Find(&restaurants).Error
+	return restaurants, err
+}
+
+func (repo *PostgresRestaurantRepo) SearchActiveByNameOrLocation(ctx context.Context, pattern string, limit, offset int) ([]models.Restaurant, error) {
+	restaurants := make([]models.Restaurant, 0)
+	err := repo.db.WithContext(ctx).
+		Where("status = ?", models.RestaurantStatusActive).
+		Where("name ILIKE ? OR city ILIKE ? OR state ILIKE ?", pattern, pattern, pattern).
+		Order("name ASC, id ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&restaurants).Error
+	return restaurants, err
 }

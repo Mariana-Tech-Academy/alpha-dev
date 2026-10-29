@@ -11,94 +11,73 @@ import (
 )
 
 var (
-	ErrInvalidQuantity = errors.New("quantity must be at least 1")
-
-	ErrCartMenuItemNotFound = errors.New("menu item not found")
-	ErrItemUnavailable      = errors.New("menu item is unavailable")
-	ErrInvalidMenuItem      = errors.New("invalid menu item ID")
-	ErrInvalidUser          = errors.New("invalid user ID")
+	ErrInvalidQuantity         = errors.New("quantity must be at least 1")
+	ErrCartMenuItemNotFound    = errors.New("menu item not found")
+	ErrItemUnavailable         = errors.New("menu item is unavailable")
+	ErrInvalidMenuItem         = errors.New("invalid menu item ID")
+	ErrInvalidUser             = errors.New("invalid user ID")
+	ErrCartDifferentRestaurant = errors.New("cart contains items from another restaurant")
+	ErrCartQuantityLimit       = errors.New("quantity cannot exceed 99")
 )
 
 type CartService interface {
-	AddItem(
-		ctx context.Context,
-		userID uint,
-		menuItemID uint,
-		quantity int,
-	) (*models.CartItem, error)
+	AddItem(ctx context.Context, userID uint, menuItemID uint, quantity int) (*models.CartItem, error)
 }
 
 type cartService struct {
 	cartRepo repository.CartRepository
-	db       *gorm.DB
+	menuRepo repository.MenuRepository
 }
 
-func NewCartService(
-	repo repository.CartRepository,
-	db *gorm.DB,
-) CartService {
-	return &cartService{
-		cartRepo: repo,
-		db:       db,
-	}
+func NewCartService(cartRepo repository.CartRepository, menuRepo repository.MenuRepository) CartService {
+	return &cartService{cartRepo: cartRepo, menuRepo: menuRepo}
 }
 
-func (s *cartService) AddItem(
-	ctx context.Context,
-	userID uint,
-	menuItemID uint,
-	quantity int,
-) (*models.CartItem, error) {
-
-	// Validate the customer ID.
+func (s *cartService) AddItem(ctx context.Context, userID uint, menuItemID uint, quantity int) (*models.CartItem, error) {
 	if userID == 0 {
 		return nil, ErrInvalidUser
 	}
-
-	// Validate the quantity.
-	if quantity < 1 {
-		return nil, ErrInvalidQuantity
-	}
-
-	// Validate the menu item ID.
 	if menuItemID == 0 {
 		return nil, ErrInvalidMenuItem
 	}
+	if quantity < 1 {
+		return nil, ErrInvalidQuantity
+	}
+	if quantity > repository.MaxCartLineQuantity {
+		return nil, ErrCartQuantityLimit
+	}
 
-	// Retrieve the menu item from PostgreSQL.
-	var menuItem models.MenuItem
-
-	err := s.db.WithContext(ctx).
-		First(&menuItem, menuItemID).Error
-
+	menuItem, err := s.menuRepo.FindMenuItemByID(ctx, menuItemID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrCartMenuItemNotFound
 	}
-
 	if err != nil {
 		return nil, err
 	}
-
-	// Check whether the menu item is available.
 	if !menuItem.Available {
 		return nil, ErrItemUnavailable
 	}
 
-	// Add the item to the customer's cart.
-	item, err := s.cartRepo.AddItem(
-		ctx,
-		userID,
-		menuItemID,
-		menuItem.RestaurantID,
-		quantity,
-	)
-
+	restaurant, err := s.menuRepo.FindRestaurantByID(ctx, menuItem.RestaurantID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrItemUnavailable
+	}
 	if err != nil {
 		return nil, err
 	}
+	if restaurant.Status != models.RestaurantStatusActive {
+		return nil, ErrItemUnavailable
+	}
 
-	// Include the current menu item details in the response.
-	item.MenuItem = menuItem
-
+	item, err := s.cartRepo.AddItem(ctx, userID, menuItemID, menuItem.RestaurantID, quantity, menuItem.Price)
+	if errors.Is(err, repository.ErrDifferentRestaurant) {
+		return nil, ErrCartDifferentRestaurant
+	}
+	if errors.Is(err, repository.ErrCartLineFull) {
+		return nil, ErrCartQuantityLimit
+	}
+	if err != nil {
+		return nil, err
+	}
 	return item, nil
 }
