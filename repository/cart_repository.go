@@ -39,14 +39,13 @@ var (
 )
 
 func (r *PostgresCartRepo) FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error) {
-	//ties the query to the request context, if the request times out or is cancelled the query is cancelled
 	var cart models.Cart
 	err := r.db.WithContext(ctx).
-		Preload("Restaurant"). //loads restaurant
-		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).// cart's Items in ascending order
-		Preload("Items.MenuItem").//menu item inside each cart 
-		Where("user_id = ?", userID).//finds the cart belonging to this customer. The ? is a placeholder. GORM fills in the value safely, which protects against SQL injection, so never build the string by hand.
-		First(&cart).Error //fetches one row into the cart variable. If there is no row, it returns gorm.ErrRecordNotFound
+		Preload("Restaurant").
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("Items.MenuItem").
+		Where("user_id = ?", userID).
+		First(&cart).Error
 	if err != nil {
 		return nil, err
 	}

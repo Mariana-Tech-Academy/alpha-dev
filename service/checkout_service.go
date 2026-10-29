@@ -10,11 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// DefaultDeliveryFee is a flat fee in kobo (N2,000).
-const DefaultDeliveryFee int64 = 200000
-
-var ErrEmptyCart = errors.New("your cart is empty")
-
 type CheckoutService interface {
 	Summary(ctx context.Context, userID uint) (*models.CheckoutSummary, error)
 }
@@ -28,14 +23,10 @@ func NewCheckoutService(cartRepo repository.CartRepository, deliveryFee int64) C
 	return &checkoutService{cartRepo: cartRepo, deliveryFee: deliveryFee}
 }
 
-// Summary builds the order review from the customer's cart. Line prices are the
-// ones saved when the item was added to the cart.
 func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.CheckoutSummary, error) {
 	if userID == 0 {
 		return nil, ErrInvalidUser
 	}
-
-	//customer hasn't added anything
 
 	cart, err := s.cartRepo.FindCartByUserID(ctx, userID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -44,15 +35,12 @@ func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.Che
 	if err != nil {
 		return nil, err
 	}
-	if len(cart.Items) == 0 {
+	if len(cart.Items) == 0 || cart.RestaurantID == nil || cart.Restaurant == nil {
 		return nil, ErrEmptyCart
 	}
-	//if the restaurant can't be found
-	if cart.Restaurant == nil {
-		return nil, ErrItemUnavailable
+	if cart.Restaurant.Status != models.RestaurantStatusActive {
+		return nil, ErrCheckoutRestaurantInactive
 	}
-
-	//building the response
 
 	summary := &models.CheckoutSummary{
 		Restaurant: models.CheckoutRestaurant{
@@ -62,9 +50,10 @@ func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.Che
 		Items:       make([]models.CheckoutItem, 0, len(cart.Items)),
 		DeliveryFee: s.deliveryFee,
 	}
-
 	for _, item := range cart.Items {
-		//converting item.Quantity cause Go won't multiply different different number types
+		if item.MenuItem.ID == 0 || !item.MenuItem.Available || item.MenuItem.RestaurantID != *cart.RestaurantID {
+			return nil, ErrCheckoutItemUnavailable
+		}
 		lineTotal := item.Price * int64(item.Quantity)
 		summary.Items = append(summary.Items, models.CheckoutItem{
 			MenuItemID: item.MenuItemID,
@@ -76,6 +65,5 @@ func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.Che
 		summary.Subtotal += lineTotal
 	}
 	summary.Total = summary.Subtotal + summary.DeliveryFee
-
 	return summary, nil
 }

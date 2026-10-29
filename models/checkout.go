@@ -1,10 +1,7 @@
 package models
 
-// CheckoutItem is one line of the order review shown before payment.
-// All money values are in minor units (kobo), like the rest of the API.
-
-
-//models/checkout.go defines the shape of the JSON the endpoint sends back.
+// CheckoutItem is one line shown before the customer places the order.
+// Money fields are minor units, so 1250 means 12.50.
 type CheckoutItem struct {
 	MenuItemID uint   `json:"menu_item_id"`
 	Name       string `json:"name"`
@@ -18,7 +15,7 @@ type CheckoutRestaurant struct {
 	Name string `json:"name"`
 }
 
-// CheckoutSummary is what the customer reviews before placing the order.
+// CheckoutSummary is the review the customer sees before placing the order.
 type CheckoutSummary struct {
 	Restaurant  CheckoutRestaurant `json:"restaurant"`
 	Items       []CheckoutItem     `json:"items"`
@@ -26,11 +23,3 @@ type CheckoutSummary struct {
 	DeliveryFee int64              `json:"delivery_fee"`
 	Total       int64              `json:"total"`
 }
- 
-//why not just return existing cart model?
-
-/*
-1. Cart stores no subtotals, no delivery fee or total, those numbers are calculated not stored in a database
-2. The cart stores Price, but the summary talks about unit_price, which matches your OrderItem model.
-4.
-*/
