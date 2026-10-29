@@ -12,7 +12,7 @@ type RestaurantRepository interface {
 	Create(ctx context.Context, restaurant *models.Restaurant) error
 	FindByID(ctx context.Context, id uint) (models.Restaurant, error)
 	FindActiveByID(ctx context.Context, id uint) (models.Restaurant, error)
-	SearchActiveByNameOrLocation(ctx context.Context, pattern string) ([]models.Restaurant, error)
+	SearchActiveByNameOrLocation(ctx context.Context, pattern string, limit, offset int) ([]models.Restaurant, error)
 	UpdateFields(ctx context.Context, id uint, fields map[string]any) error
 	UpdateAvailability(
 		ctx context.Context,
@@ -91,18 +91,14 @@ func (repo *PostgresRestaurantRepo) GetActiveRestaurants(ctx context.Context, pa
 	return restaurants, err
 }
 
-func (repo *PostgresRestaurantRepo) SearchActiveByNameOrLocation(ctx context.Context, pattern string) ([]models.Restaurant, error) {
-	// Initialize an empty slice to hold the results
-	var restaurants []models.Restaurant = []models.Restaurant{}
-	// Use a case-insensitive search for name or location (city/state) and only return active restaurants.
+func (repo *PostgresRestaurantRepo) SearchActiveByNameOrLocation(ctx context.Context, pattern string, limit, offset int) ([]models.Restaurant, error) {
+	restaurants := make([]models.Restaurant, 0)
 	err := repo.db.WithContext(ctx).
 		Where("status = ?", models.RestaurantStatusActive).
-		Where("LOWER(name) LIKE LOWER(?) OR LOWER(city) LIKE LOWER(?)", pattern, pattern).
+		Where("name ILIKE ? OR city ILIKE ? OR state ILIKE ?", pattern, pattern, pattern).
+		Order("name ASC, id ASC").
+		Limit(limit).
+		Offset(offset).
 		Find(&restaurants).Error
-	// Return an empty slice if no records are found, instead of returning an error.
-	if err != nil {
-		return []models.Restaurant{}, err
-	}
-
-	return restaurants, nil
+	return restaurants, err
 }

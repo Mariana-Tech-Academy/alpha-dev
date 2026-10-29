@@ -280,19 +280,25 @@ func formField(r *http.Request, key string) *string {
 }
 
 func (h *RestaurantHandler) SearchRestaurants(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
 
-	// Extract query parameter from URL
-	req := r.URL.Query().Get("q")
-
-	restaurants, err := h.RestaurantService.SearchRestaurants(r.Context(), req)
+	restaurants, err := h.RestaurantService.SearchRestaurants(r.Context(), r.URL.Query().Get("q"), page, limit)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-            "error": "Failed to fetch search results"})
+		log.Printf("search restaurants: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(restaurants)
+	utils.Success(w, http.StatusOK, "restaurants retrieved", restaurants)
 }
