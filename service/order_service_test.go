@@ -81,6 +81,38 @@ func TestPlaceOrder(t *testing.T) {
 		}
 	})
 
+	t.Run("phone with symbols is accepted", func(t *testing.T) {
+		req := validDelivery()
+		req.DeliveryPhone = "+234 (801) 234-5678"
+		repo := &fakeOrderRepo{}
+		if _, err := NewOrderService(repo).PlaceOrder(ctx, 4, req); err != nil {
+			t.Fatalf("formatted phone: %v", err)
+		}
+		if repo.saved.DeliveryPhone != "+234 (801) 234-5678" {
+			t.Fatalf("phone = %q", repo.saved.DeliveryPhone)
+		}
+	})
+
+	t.Run("phone with letters", func(t *testing.T) {
+		req := validDelivery()
+		req.DeliveryPhone = "0801-CALL-NOW"
+		_, err := NewOrderService(&fakeOrderRepo{}).PlaceOrder(ctx, 4, req)
+		var validationErr *OrderValidationError
+		if !errors.As(err, &validationErr) || validationErr.Fields["delivery_phone"] == "" {
+			t.Fatalf("letter phone: %v", err)
+		}
+	})
+
+	t.Run("instructions too long", func(t *testing.T) {
+		req := validDelivery()
+		req.DeliveryInstructions = strings.Repeat("a", 201)
+		_, err := NewOrderService(&fakeOrderRepo{}).PlaceOrder(ctx, 4, req)
+		var validationErr *OrderValidationError
+		if !errors.As(err, &validationErr) || validationErr.Fields["delivery_instructions"] == "" {
+			t.Fatalf("long instructions: %v", err)
+		}
+	})
+
 	t.Run("empty cart", func(t *testing.T) {
 		_, err := NewOrderService(&fakeOrderRepo{err: repository.ErrEmptyCart}).PlaceOrder(ctx, 4, validDelivery())
 		if !errors.Is(err, ErrEmptyCart) {
