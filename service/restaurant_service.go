@@ -49,6 +49,7 @@ type RestaurantService interface {
 	UpdateRestaurant(ctx context.Context, id uint, userID uint, role models.Role, input *models.UpdateRestaurantInput, file *multipart.FileHeader) (*models.Restaurant, error)
 	GetRestaurantDetails(ctx context.Context, id uint) (models.RestaurantDetails, error)
 	ListActiveRestaurants(ctx context.Context, page, limit int) ([]models.RestaurantProfile, error)
+	SearchRestaurants(ctx context.Context, query string, page, limit int) ([]models.RestaurantProfile, error)
 }
 
 type restaurantService struct {
@@ -349,6 +350,32 @@ func (s *restaurantService) ListActiveRestaurants(ctx context.Context, page, lim
 		return nil, err
 	}
 
+	profiles := make([]models.RestaurantProfile, 0, len(restaurants))
+	for _, restaurant := range restaurants {
+		profiles = append(profiles, restaurant.Profile())
+	}
+	return profiles, nil
+}
+
+func (s *restaurantService) SearchRestaurants(ctx context.Context, query string, page, limit int) ([]models.RestaurantProfile, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []models.RestaurantProfile{}, nil
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > maxRestaurantPageSize {
+		limit = maxRestaurantPageSize
+	}
+
+	restaurants, err := s.restaurantRepo.SearchActiveByNameOrLocation(ctx, "%"+escapeLike(query)+"%", limit, (page-1)*limit)
+	if err != nil {
+		return nil, err
+	}
 	profiles := make([]models.RestaurantProfile, 0, len(restaurants))
 	for _, restaurant := range restaurants {
 		profiles = append(profiles, restaurant.Profile())
