@@ -21,6 +21,7 @@ func RestaurantRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) 
 
 	// public routes: GET /restaurants, GET /restaurants/{id}
 	router.HandleFunc("/restaurants", restaurantHandler.ListActiveRestaurants).Methods(http.MethodGet)
+	router.HandleFunc("/restaurants/search", restaurantHandler.SearchRestaurants).Methods(http.MethodGet)
 	router.HandleFunc("/restaurants/{id}", restaurantHandler.GetRestaurantDetails).Methods(http.MethodGet)
 	// manager routes: POST /restaurants, PUT /restaurants/{id}, PATCH /restaurants/{id}/status
 	// The service must also check the restaurant belongs to the calling manager.

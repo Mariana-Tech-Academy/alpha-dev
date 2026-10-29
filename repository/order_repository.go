@@ -1,57 +1,19 @@
-// EPIC 6 - CHK-03: ORDER REPOSITORY - FILE 3:
-
-// PURPOSE:
-// Handles order placement and database operations using GORM and PostgreSQL.
-
-// IMPLEMENTATION:
-// 1. Retrieves the authenticated customer's shopping cart.
-// 2. Checks that the cart contains items.
-// 3. Verifies that the restaurant is active.
-// 4. Checks that all menu items are available.
-// 5. Calculates the order subtotal and prepares the order items.
-// 6. Generates an order reference and sets the order status to Pending.
-// 7. Saves the order and its items to PostgreSQL.
-// 8. Clears the customer's cart after successful checkout.
-
-// DATABASE TRANSACTION:
-// All checkout database operations run inside a GORM transaction.
-// If an operation returns an error, the transaction is rolled back.
-// This prevents partially completed checkout operations.
-
-// HOW IT WORKS:
-// The service calls OrderRepository.PlaceOrder.
-// The repository validates the cart, restaurant and menu items.
-// It calculates the order totals and creates the order.
-// Once the order is saved, the cart items are removed.
-// The completed order is returned to the service.
-
-// I implemented the checkout logic in the repository using GORM.
-// The repository retrieves the customer's cart, validates the restaurant
-// and menu items, calculates the total and creates an order with
-// Pending status. I used a database transaction so that order creation
-// and cart clearing are treated as one operation.
-
 package repository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
+	"fmt"
+	"time"
 
 	"alpha-dev/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// Checkout must create the order, create its items and clear the cart inside one
-// r.db.Transaction(func(tx *gorm.DB) error { ... }) call.
 type OrderRepository interface {
-	PlaceOrder(
-		ctx context.Context,
-		userID uint,
-		order *models.Order,
-	) (*models.Order, error)
+	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
 }
 
 type PostgresOrderRepo struct {
@@ -68,125 +30,96 @@ var (
 	ErrUnavailableItem    = errors.New("one or more menu items are unavailable")
 )
 
-func (r *PostgresOrderRepo) PlaceOrder(
-	ctx context.Context,
-	userID uint,
-	order *models.Order,
-) (*models.Order, error) {
-
+func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error) {
 	var result *models.Order
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-
-		// Step 1: Retrieve the customer's cart.
 		var cart models.Cart
-
-		if err := tx.
-			Preload("Items.MenuItem").
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("user_id = ?", userID).
 			First(&cart).Error; err != nil {
-
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrEmptyCart
 			}
-
 			return err
 		}
 
-		// Step 2: Check that the cart contains items.
-		if len(cart.Items) == 0 {
-			return ErrEmptyCart
+		if err := tx.Preload("MenuItem").Where("cart_id = ?", cart.ID).Find(&cart.Items).Error; err != nil {
+			return err
 		}
-
-		// Step 3: Check that the restaurant is active.
-		if cart.RestaurantID == nil {
+		if len(cart.Items) == 0 || cart.RestaurantID == nil {
 			return ErrEmptyCart
 		}
 
 		var restaurant models.Restaurant
-
-		if err := tx.First(
-			&restaurant,
-			*cart.RestaurantID,
-		).Error; err != nil {
+		if err := tx.First(&restaurant, *cart.RestaurantID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrInactiveRestaurant
+			}
 			return err
 		}
-
 		if restaurant.Status != models.RestaurantStatusActive {
 			return ErrInactiveRestaurant
 		}
 
-		// Step 4: Check menu availability and calculate subtotal.
+		orderItems := make([]models.OrderItem, 0, len(cart.Items))
 		var subtotal int64
-
-		for _, cartItem := range cart.Items {
-			menuItem := cartItem.MenuItem
-
-			// Reject unavailable items or items from another restaurant.
-			if !menuItem.Available ||
-				menuItem.RestaurantID != *cart.RestaurantID {
+		for _, line := range cart.Items {
+			if line.MenuItem.ID == 0 || !line.MenuItem.Available || line.MenuItem.RestaurantID != *cart.RestaurantID {
 				return ErrUnavailableItem
 			}
-
-			// Calculate the cost of each item.
-			lineTotal := menuItem.Price * int64(cartItem.Quantity)
-
-			// Add the item cost to the subtotal.
+			lineTotal := line.Price * int64(line.Quantity)
 			subtotal += lineTotal
-		}
-		// Step 5A: Prepare the order items.
-		orderItems := make([]models.OrderItem, 0, len(cart.Items))
-
-		for _, cartItem := range cart.Items {
-			menuItem := cartItem.MenuItem
-
 			orderItems = append(orderItems, models.OrderItem{
-				MenuItemID: cartItem.MenuItemID,
-				Name:       menuItem.Name,
-				UnitPrice:  menuItem.Price,
-				Quantity:   cartItem.Quantity,
-				LineTotal:  menuItem.Price * int64(cartItem.Quantity),
+				MenuItemID: line.MenuItemID,
+				Name:       line.MenuItem.Name,
+				UnitPrice:  line.Price,
+				Quantity:   line.Quantity,
+				LineTotal:  lineTotal,
 			})
 		}
-		// Step 5B: Prepare the order for checkout.
-		// Generate a unique order reference
-		randomBytes := make([]byte, 8)
 
-		if _, err := rand.Read(randomBytes); err != nil {
+		var seq struct {
+			OrderDate  time.Time `gorm:"column:order_date"`
+			LastNumber int       `gorm:"column:last_number"`
+		}
+		if err := tx.Raw(`
+			INSERT INTO order_daily_sequences (order_date, last_number)
+			VALUES (CURRENT_DATE, 1)
+			ON CONFLICT (order_date)
+			DO UPDATE SET last_number = order_daily_sequences.last_number + 1
+			RETURNING order_date, last_number
+		`).Scan(&seq).Error; err != nil {
 			return err
 		}
+		if seq.LastNumber < 1 {
+			return errors.New("order number sequence did not advance")
+		}
 
-		order.OrderNumber = "ORD-" + hex.EncodeToString(randomBytes)
+		order.OrderNumber = fmt.Sprintf("ORD-%s-%03d", seq.OrderDate.UTC().Format("20060102"), seq.LastNumber)
 		order.CustomerID = userID
 		order.RestaurantID = *cart.RestaurantID
 		order.Status = models.OrderStatusPending
+		order.DeliveryFee = 0
 		order.Subtotal = subtotal
-		order.Total = subtotal + order.DeliveryFee
+		order.Total = subtotal
 		order.Items = orderItems
 
-		// Step 5C: Save the order and its items to PostgreSQL
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
-
-		// Step 5D: Clear the customer's cart after checkout.
-		if err := tx.Where("cart_id = ?", cart.ID).
-			Delete(&models.CartItem{}).Error; err != nil {
+		if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&cart).Updates(map[string]any{"restaurant_id": nil}).Error; err != nil {
 			return err
 		}
 
-		if err := tx.Model(&cart).
-			Update("restaurant_id", nil).Error; err != nil {
-			return err
-		}
 		result = order
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
 }
