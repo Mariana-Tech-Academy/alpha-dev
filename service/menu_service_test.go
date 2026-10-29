@@ -30,6 +30,7 @@ type fakeMenuRepo struct {
 	searchQuery      repository.MenuSearchQuery
 	searchErr        error
 	searchResults    []models.MenuSearchResult
+	searchTotal      int64
 }
 
 func (f *fakeMenuRepo) FindRestaurantByID(context.Context, uint) (models.Restaurant, error) {
@@ -73,15 +74,15 @@ func (f *fakeMenuRepo) DeleteMenuItem(_ context.Context, id uint) error {
 	return nil
 }
 
-func (f *fakeMenuRepo) SearchMenuItems(_ context.Context, q repository.MenuSearchQuery) ([]models.MenuSearchResult, error) {
+func (f *fakeMenuRepo) SearchMenuItems(_ context.Context, q repository.MenuSearchQuery) ([]models.MenuSearchResult, int64, error) {
 	f.searchQuery = q
 	if f.searchErr != nil {
-		return nil, f.searchErr
+		return nil, 0, f.searchErr
 	}
 	if f.searchResults == nil {
-		return []models.MenuSearchResult{}, nil
+		return []models.MenuSearchResult{}, f.searchTotal, nil
 	}
-	return f.searchResults, nil
+	return f.searchResults, f.searchTotal, nil
 }
 
 func validMenuRequest() CreateMenuItemRequest {
@@ -410,8 +411,8 @@ func TestDeleteMenuItem(t *testing.T) {
 
 func TestSearchMenuItems(t *testing.T) {
 	t.Run("trims the query and searches available items", func(t *testing.T) {
-		repo := &fakeMenuRepo{}
-		items, err := NewMenuService(repo).SearchMenuItems(context.Background(), MenuSearch{
+		repo := &fakeMenuRepo{searchTotal: 42}
+		result, err := NewMenuService(repo).SearchMenuItems(context.Background(), MenuSearch{
 			Query: "  pi%zza_\\  ",
 			Page:  0,
 			Limit: 100,
@@ -419,8 +420,11 @@ func TestSearchMenuItems(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if items == nil {
+		if items, ok := result.Items.([]models.MenuSearchResult); !ok || items == nil {
 			t.Fatal("expected an empty slice")
+		}
+		if result.Page != 1 || result.Limit != 20 || result.Total != 42 {
+			t.Fatalf("page = %d limit = %d total = %d", result.Page, result.Limit, result.Total)
 		}
 		if repo.searchQuery.Query != `pi\%zza\_\\` || !repo.searchQuery.Available {
 			t.Fatalf("query = %#v", repo.searchQuery)

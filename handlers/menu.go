@@ -179,7 +179,7 @@ func (h *MenuHandler) SearchMenuItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.MenuService.SearchMenuItems(r.Context(), search)
+	result, err := h.MenuService.SearchMenuItems(r.Context(), search)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidCategoryID),
@@ -194,7 +194,7 @@ func (h *MenuHandler) SearchMenuItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.Success(w, http.StatusOK, "menu items retrieved", items)
+	utils.Success(w, http.StatusOK, "menu items retrieved", result)
 }
 
 func parseUintParam(value string) (*uint, error) {

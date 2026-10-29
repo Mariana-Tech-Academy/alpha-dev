@@ -25,7 +25,7 @@ func (err *CategoryValidationError) Error() string {
 
 type CategoryService interface {
 	CreateCategory(ctx context.Context, name string) (models.CategorySummary, error)
-	GetCategories(ctx context.Context) ([]models.CategorySummary, error)
+	GetCategories(ctx context.Context, page, limit int) (models.Page, error)
 	GetCategoryByID(ctx context.Context, id uint) (models.CategoryDetails, error)
 }
 
@@ -59,16 +59,18 @@ func (s *categoryService) CreateCategory(ctx context.Context, name string) (mode
 	return models.CategorySummary{ID: cat.ID, Name: cat.Name}, nil
 }
 
-func (s *categoryService) GetCategories(ctx context.Context) ([]models.CategorySummary, error) {
-	categories, err := s.categoryRepo.FindAll(ctx)
+func (s *categoryService) GetCategories(ctx context.Context, page, limit int) (models.Page, error) {
+	page, limit = models.NormalizePage(page, limit)
+
+	categories, total, err := s.categoryRepo.FindAll(ctx, page, limit)
 	if err != nil {
-		return nil, err
+		return models.Page{}, err
 	}
 	summaries := make([]models.CategorySummary, 0, len(categories))
 	for _, category := range categories {
 		summaries = append(summaries, models.CategorySummary{ID: category.ID, Name: category.Name})
 	}
-	return summaries, nil
+	return models.Page{Items: summaries, Page: page, Limit: limit, Total: total}, nil
 }
 
 func (s *categoryService) GetCategoryByID(ctx context.Context, id uint) (models.CategoryDetails, error) {

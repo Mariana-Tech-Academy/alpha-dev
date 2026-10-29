@@ -256,14 +256,14 @@ func (h *RestaurantHandler) ListActiveRestaurants(w http.ResponseWriter, r *http
 		}
 	}
 
-	profiles, err := h.RestaurantService.ListActiveRestaurants(r.Context(), page, limit)
+	result, err := h.RestaurantService.ListActiveRestaurants(r.Context(), page, limit)
 	if err != nil {
 		log.Printf("list restaurants: %v", err)
 		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
 		return
 	}
 
-	utils.Success(w, http.StatusOK, "restaurants retrieved", profiles)
+	utils.Success(w, http.StatusOK, "restaurants retrieved", result)
 }
 
 // formField returns the value when the multipart form included the key, including a blank value.

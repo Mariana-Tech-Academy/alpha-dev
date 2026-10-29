@@ -43,7 +43,7 @@ type MenuService interface {
 	GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error)
 	UpdateMenuItem(ctx context.Context, userID uint, id uint, req UpdateMenuItemRequest) (*models.MenuItem, error)
 	DeleteMenuItem(ctx context.Context, userID uint, id uint) error
-	SearchMenuItems(ctx context.Context, search MenuSearch) ([]models.MenuSearchResult, error)
+	SearchMenuItems(ctx context.Context, search MenuSearch) (models.Page, error)
 }
 
 // MenuSearch is the query for GET /menu.
@@ -173,37 +173,27 @@ func (s *menuService) GetMenuItemDetails(ctx context.Context, id uint) (models.P
 	}, nil
 }
 
-const maxMenuPageSize = 20
-
-func (s *menuService) SearchMenuItems(ctx context.Context, search MenuSearch) ([]models.MenuSearchResult, error) {
+func (s *menuService) SearchMenuItems(ctx context.Context, search MenuSearch) (models.Page, error) {
 	search.Query = strings.TrimSpace(search.Query)
 	if search.CategoryID != nil && *search.CategoryID == 0 {
-		return nil, ErrInvalidCategoryID
+		return models.Page{}, ErrInvalidCategoryID
 	}
 	if search.RestaurantID != nil && *search.RestaurantID == 0 {
-		return nil, ErrInvalidRestaurantID
+		return models.Page{}, ErrInvalidRestaurantID
 	}
 	if (search.MinPrice != nil && *search.MinPrice < 0) || (search.MaxPrice != nil && *search.MaxPrice < 0) {
-		return nil, ErrInvalidPriceBound
+		return models.Page{}, ErrInvalidPriceBound
 	}
 	if search.MinPrice != nil && search.MaxPrice != nil && *search.MinPrice > *search.MaxPrice {
-		return nil, ErrInvalidPriceRange
+		return models.Page{}, ErrInvalidPriceRange
 	}
-	if search.Page < 1 {
-		search.Page = 1
-	}
-	if search.Limit < 1 {
-		search.Limit = 10
-	}
-	if search.Limit > maxMenuPageSize {
-		search.Limit = maxMenuPageSize
-	}
+	search.Page, search.Limit = models.NormalizePage(search.Page, search.Limit)
 	available := true
 	if search.Available != nil {
 		available = *search.Available
 	}
 
-	items, err := s.menuRepo.SearchMenuItems(ctx, repository.MenuSearchQuery{
+	items, total, err := s.menuRepo.SearchMenuItems(ctx, repository.MenuSearchQuery{
 		Query:        escapeLike(search.Query),
 		CategoryID:   search.CategoryID,
 		RestaurantID: search.RestaurantID,
@@ -214,12 +204,12 @@ func (s *menuService) SearchMenuItems(ctx context.Context, search MenuSearch) ([
 		Offset:       (search.Page - 1) * search.Limit,
 	})
 	if err != nil {
-		return nil, err
+		return models.Page{}, err
 	}
 	if items == nil {
 		items = []models.MenuSearchResult{}
 	}
-	return items, nil
+	return models.Page{Items: items, Page: search.Page, Limit: search.Limit, Total: total}, nil
 }
 
 func escapeLike(value string) string {

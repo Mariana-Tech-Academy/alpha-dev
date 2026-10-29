@@ -18,6 +18,7 @@ type fakeRestaurantRepo struct {
 	findErr error
 	updates map[string]any
 	list    []models.Restaurant
+	total   int64
 	listErr error
 	page    int
 	limit   int
@@ -52,13 +53,13 @@ func (f *fakeRestaurantRepo) UpdateFields(_ context.Context, _ uint, fields map[
 	return nil
 }
 
-func (f *fakeRestaurantRepo) GetActiveRestaurants(_ context.Context, page, limit int) ([]models.Restaurant, error) {
+func (f *fakeRestaurantRepo) GetActiveRestaurants(_ context.Context, page, limit int) ([]models.Restaurant, int64, error) {
 	f.page = page
 	f.limit = limit
 	if f.listErr != nil {
-		return nil, f.listErr
+		return nil, 0, f.listErr
 	}
-	return f.list, nil
+	return f.list, f.total, nil
 }
 
 func validRestaurant() *models.Restaurant {
@@ -253,24 +254,29 @@ func TestListActiveRestaurants(t *testing.T) {
 	second.Name = "Noodle Bar"
 
 	t.Run("returns a page of active restaurants", func(t *testing.T) {
-		repo := &fakeRestaurantRepo{list: []models.Restaurant{first, second}}
-		profiles, err := NewRestaurantService(repo).ListActiveRestaurants(context.Background(), 0, 100)
+		repo := &fakeRestaurantRepo{list: []models.Restaurant{first, second}, total: 25}
+		result, err := NewRestaurantService(repo).ListActiveRestaurants(context.Background(), 0, 100)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if repo.page != 1 || repo.limit != 20 {
 			t.Fatalf("page = %d limit = %d", repo.page, repo.limit)
 		}
+		if result.Page != 1 || result.Limit != 20 || result.Total != 25 {
+			t.Fatalf("page = %d limit = %d total = %d", result.Page, result.Limit, result.Total)
+		}
+		profiles := result.Items.([]models.RestaurantProfile)
 		if len(profiles) != 2 || profiles[0].Name != "Pizza Place" || profiles[1].ID != 8 {
 			t.Fatalf("profiles = %+v", profiles)
 		}
 	})
 
 	t.Run("empty page", func(t *testing.T) {
-		profiles, err := NewRestaurantService(&fakeRestaurantRepo{}).ListActiveRestaurants(context.Background(), 2, 10)
+		result, err := NewRestaurantService(&fakeRestaurantRepo{}).ListActiveRestaurants(context.Background(), 2, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
+		profiles := result.Items.([]models.RestaurantProfile)
 		if profiles == nil || len(profiles) != 0 {
 			t.Fatalf("profiles = %#v", profiles)
 		}

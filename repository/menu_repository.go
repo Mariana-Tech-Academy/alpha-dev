@@ -16,7 +16,7 @@ type MenuRepository interface {
 	UpdateMenuItemAvailability(ctx context.Context, id uint, available bool) error
 	UpdateMenuItem(ctx context.Context, id uint, fields map[string]any) error
 	DeleteMenuItem(ctx context.Context, id uint) error
-	SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, error)
+	SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, int64, error)
 }
 
 // MenuSearchQuery is a normalized menu search. Query is already escaped for ILIKE.
@@ -78,11 +78,10 @@ func (repo *PostgresMenuRepo) UpdateMenuItemAvailability(ctx context.Context, id
 	return nil
 }
 
-func (repo *PostgresMenuRepo) SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, error) {
+func (repo *PostgresMenuRepo) SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, int64, error) {
 	items := make([]models.MenuSearchResult, 0)
 	query := repo.db.WithContext(ctx).
 		Model(&models.MenuItem{}).
-		Select("menu_items.id, menu_items.name, menu_items.description, menu_items.price, menu_items.image_url, categories.name AS category, menu_items.restaurant_id, restaurants.name AS restaurant_name").
 		Joins("JOIN restaurants ON restaurants.id = menu_items.restaurant_id AND restaurants.deleted_at IS NULL").
 		Joins("LEFT JOIN categories ON categories.id = menu_items.category_id AND categories.deleted_at IS NULL").
 		Where("restaurants.status = ?", models.RestaurantStatusActive).
@@ -102,9 +101,20 @@ func (repo *PostgresMenuRepo) SearchMenuItems(ctx context.Context, q MenuSearchQ
 	if q.MaxPrice != nil {
 		query = query.Where("menu_items.price <= ?", *q.MaxPrice)
 	}
-	err := query.Order("menu_items.name ASC, menu_items.id ASC").
+
+	// Session lets the count and the page query both start from the same filters.
+	query = query.Session(&gorm.Session{})
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Select("menu_items.id, menu_items.name, menu_items.description, menu_items.price, menu_items.image_url, categories.name AS category, menu_items.restaurant_id, restaurants.name AS restaurant_name").
+		Order("menu_items.name ASC, menu_items.id ASC").
 		Limit(q.Limit).
 		Offset(q.Offset).
 		Scan(&items).Error
-	return items, err
+	return items, total, err
 }

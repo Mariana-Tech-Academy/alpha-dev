@@ -60,13 +60,24 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *CategoryHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
-	categories, err := h.CategoryService.GetCategories(r.Context())
+	page, err := parseQueryInt(r.URL.Query().Get("page"))
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "page must be a number")
+		return
+	}
+	limit, err := parseQueryInt(r.URL.Query().Get("limit"))
+	if err != nil {
+		utils.Error(w, http.StatusBadRequest, "limit must be a number")
+		return
+	}
+
+	result, err := h.CategoryService.GetCategories(r.Context(), page, limit)
 	if err != nil {
 		log.Printf("list categories: %v", err)
 		utils.Error(w, http.StatusInternalServerError, "unable to load categories")
 		return
 	}
-	utils.Success(w, http.StatusOK, "categories retrieved", categories)
+	utils.Success(w, http.StatusOK, "categories retrieved", result)
 }
 
 func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {

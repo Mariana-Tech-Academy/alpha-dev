@@ -10,7 +10,7 @@ import (
 
 type CategoryRepository interface {
 	Create(ctx context.Context, cat *models.Category) error
-	FindAll(ctx context.Context) ([]models.Category, error)
+	FindAll(ctx context.Context, page, limit int) ([]models.Category, int64, error)
 	FindByID(ctx context.Context, id uint) (models.Category, error)
 	FindPublicMenuItems(ctx context.Context, categoryID uint) ([]models.CategoryMenuItem, error)
 }
@@ -27,10 +27,19 @@ func (r *PostgresCategoryRepo) Create(ctx context.Context, cat *models.Category)
 	return r.db.WithContext(ctx).Create(cat).Error
 }
 
-func (r *PostgresCategoryRepo) FindAll(ctx context.Context) ([]models.Category, error) {
+func (r *PostgresCategoryRepo) FindAll(ctx context.Context, page, limit int) ([]models.Category, int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&models.Category{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
 	cats := make([]models.Category, 0)
-	err := r.db.WithContext(ctx).Order("name ASC, id ASC").Find(&cats).Error
-	return cats, err
+	err := r.db.WithContext(ctx).
+		Order("name ASC, id ASC").
+		Limit(limit).
+		Offset((page - 1) * limit).
+		Find(&cats).Error
+	return cats, total, err
 }
 
 func (r *PostgresCategoryRepo) FindByID(ctx context.Context, id uint) (models.Category, error) {

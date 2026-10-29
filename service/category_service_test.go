@@ -29,8 +29,11 @@ func (f *fakeCategoryRepo) Create(_ context.Context, cat *models.Category) error
 	return nil
 }
 
-func (f *fakeCategoryRepo) FindAll(context.Context) ([]models.Category, error) {
-	return f.categories, nil
+func (f *fakeCategoryRepo) FindAll(_ context.Context, page, limit int) ([]models.Category, int64, error) {
+	total := int64(len(f.categories))
+	start := min((page-1)*limit, len(f.categories))
+	end := min(start+limit, len(f.categories))
+	return f.categories[start:end], total, nil
 }
 
 func (f *fakeCategoryRepo) FindByID(_ context.Context, id uint) (models.Category, error) {
@@ -85,12 +88,25 @@ func TestGetCategories(t *testing.T) {
 	repo.categories[1].ID = 2
 	svc := NewCategoryService(repo)
 
-	categories, err := svc.GetCategories(context.Background())
+	result, err := svc.GetCategories(context.Background(), 0, 0)
 	if err != nil {
 		t.Fatalf("list categories: %v", err)
 	}
+	categories := result.Items.([]models.CategorySummary)
 	if len(categories) != 2 || categories[0].Name != "Pizza" || categories[1].Name != "Drinks" {
 		t.Fatalf("categories = %#v", categories)
+	}
+	if result.Page != 1 || result.Limit != models.DefaultPageSize || result.Total != 2 {
+		t.Fatalf("page = %d limit = %d total = %d", result.Page, result.Limit, result.Total)
+	}
+
+	result, err = svc.GetCategories(context.Background(), 2, 1)
+	if err != nil {
+		t.Fatalf("second page: %v", err)
+	}
+	categories = result.Items.([]models.CategorySummary)
+	if len(categories) != 1 || categories[0].Name != "Drinks" || result.Page != 2 || result.Total != 2 {
+		t.Fatalf("second page = %#v", result)
 	}
 }
 
