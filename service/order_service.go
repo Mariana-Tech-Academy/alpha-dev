@@ -19,6 +19,8 @@
 // It passes the authenticated customer's ID and delivery information
 // to the repository, then returns the result to the handler.
 
+// CHK-02: PlaceOrder trims and validates the delivery details first.
+
 package service
 
 import (
@@ -48,6 +50,11 @@ func (s *orderService) PlaceOrder(
 	userID uint,
 	order *models.Order,
 ) (*models.Order, error) {
+
+	trimDelivery(order)
+	if fields := validateDelivery(order); len(fields) > 0 {
+		return nil, &DeliveryValidationError{Fields: fields}
+	}
 
 	return s.orderRepo.PlaceOrder(ctx, userID, order)
 }

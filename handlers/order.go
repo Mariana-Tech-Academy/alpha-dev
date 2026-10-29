@@ -64,16 +64,7 @@ func (h *OrderHandler) PlaceOrder(
 		return
 	}
 
-	// Validate required delivery information.
-	if order.DeliveryName == "" ||
-		order.DeliveryPhone == "" ||
-		order.DeliveryAddress == "" ||
-		order.DeliveryCity == "" ||
-		order.DeliveryState == "" {
-
-		utils.Error(w, http.StatusBadRequest, "delivery information is required")
-		return
-	}
+	// Delivery information is validated in the service (CHK-02).
 
 	// Payment is simulated and assumed successful for the MVP.
 	// No real payment provider is used.
@@ -87,7 +78,12 @@ func (h *OrderHandler) PlaceOrder(
 
 	// Step 4: Handle checkout errors.
 	if err != nil {
+		var validationError *service.DeliveryValidationError
+
 		switch {
+		case errors.As(err, &validationError):
+			utils.ValidationError(w, "check the delivery details", validationError.Fields)
+
 		case errors.Is(err, repository.ErrEmptyCart):
 			utils.Error(w, http.StatusBadRequest, "your cart is empty")
 
