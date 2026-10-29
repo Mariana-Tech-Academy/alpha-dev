@@ -24,6 +24,7 @@ var (
 	ErrInvalidPriceBound    = errors.New("min_price and max_price must be zero or greater")
 	ErrInvalidCategoryID    = errors.New("category_id must be a positive number")
 	ErrInvalidRestaurantID  = errors.New("restaurant_id must be a positive number")
+	ErrMenuUnavailable      = errors.New("restaurant menu is not available")
 )
 
 // CreateMenuItemRequest is the body for POST /menu.
@@ -37,8 +38,20 @@ type CreateMenuItemRequest struct {
 	ImageURL     string `json:"image_url"`
 }
 
+// MenuItemResponse is one row on a restaurant's menu.
+type MenuItemResponse struct {
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	Price      int64  `json:"price"`
+	ImageURL   string `json:"image_url"`
+	CategoryID uint   `json:"category_id"`
+	Category   string `json:"category"`
+	Available  bool   `json:"available"`
+}
+
 type MenuService interface {
 	CreateMenuItem(ctx context.Context, userID uint, req CreateMenuItemRequest) (*models.MenuItem, error)
+	GetRestaurantMenu(ctx context.Context, restaurantID uint, categoryID uint) ([]MenuItemResponse, error)
 	UpdateMenuItemAvailability(ctx context.Context, userID uint, itemID uint, available bool) (*models.MenuItem, error)
 	GetMenuItemDetails(ctx context.Context, id uint) (models.PublicMenuItem, error)
 	UpdateMenuItem(ctx context.Context, userID uint, id uint, req UpdateMenuItemRequest) (*models.MenuItem, error)
@@ -220,6 +233,42 @@ func (s *menuService) SearchMenuItems(ctx context.Context, search MenuSearch) ([
 		items = []models.MenuSearchResult{}
 	}
 	return items, nil
+}
+
+func (s *menuService) GetRestaurantMenu(ctx context.Context, restaurantID uint, categoryID uint) ([]MenuItemResponse, error) {
+	if restaurantID == 0 {
+		return nil, ErrRestaurantIDRequired
+	}
+
+	restaurant, err := s.menuRepo.FindRestaurantByID(ctx, restaurantID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRestaurantNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if restaurant.Status != models.RestaurantStatusActive {
+		return nil, ErrMenuUnavailable
+	}
+
+	items, err := s.menuRepo.FindMenuByRestaurant(ctx, restaurantID, categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	menu := make([]MenuItemResponse, 0, len(items))
+	for _, item := range items {
+		menu = append(menu, MenuItemResponse{
+			ID:         item.ID,
+			Name:       item.Name,
+			Price:      item.Price,
+			ImageURL:   item.ImageURL,
+			CategoryID: item.CategoryID,
+			Category:   item.Category.Name,
+			Available:  item.Available,
+		})
+	}
+	return menu, nil
 }
 
 func escapeLike(value string) string {
