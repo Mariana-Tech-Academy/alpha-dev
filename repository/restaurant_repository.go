@@ -97,7 +97,7 @@ func (repo *PostgresRestaurantRepo) SearchActiveByNameOrLocation(ctx context.Con
 	// Use a case-insensitive search for name or location (city/state) and only return active restaurants.
 	err := repo.db.WithContext(ctx).
 		Where("status = ?", models.RestaurantStatusActive).
-		Where("LOWER(name) LIKE LOWER(?) OR LOWER(location) LIKE LOWER(?)", pattern, pattern).
+		Where("LOWER(name) LIKE LOWER(?) OR LOWER(city) LIKE LOWER(?)", pattern, pattern).
 		Find(&restaurants).Error
 	// Return an empty slice if no records are found, instead of returning an error.
 	if err != nil {
