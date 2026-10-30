@@ -2,28 +2,19 @@ package repository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
+	"fmt"
+	"time"
 
 	"alpha-dev/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrderRepository interface {
-	PlaceOrder(
-		ctx context.Context,
-		userID uint,
-		order *models.Order,
-	) (*models.Order, error)
-
-	FindCustomerOrders(
-		ctx context.Context,
-		customerID uint,
-		limit int,
-		offset int,
-	) ([]models.Order, int64, error)
+	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
+	FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error)
 }
 
 type PostgresOrderRepo struct {
@@ -40,53 +31,12 @@ var (
 	ErrUnavailableItem    = errors.New("one or more menu items are unavailable")
 )
 
-// Read one page of the customer's orders, newest first.
-func (r *PostgresOrderRepo) FindCustomerOrders(
-	ctx context.Context,
-	customerID uint,
-	limit int,
-	offset int,
-) ([]models.Order, int64, error) {
-	orders := make([]models.Order, 0)
-	var total int64
-
-	query := r.db.WithContext(ctx).
-		Model(&models.Order{}).
-		Where("customer_id = ?", customerID)
-
-	// Count the customer's orders before applying pagination.
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	// Include the restaurant name and keep the order consistent.
-	err := query.
-		Preload("Restaurant").
-		Order("created_at DESC, id DESC").
-		Limit(limit).
-		Offset(offset).
-		Find(&orders).Error
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return orders, total, nil
-}
-
-// Keep checkout and cart clearing inside one transaction.
-func (r *PostgresOrderRepo) PlaceOrder(
-	ctx context.Context,
-	userID uint,
-	order *models.Order,
-) (*models.Order, error) {
+func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error) {
 	var result *models.Order
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Retrieve the customer's cart.
 		var cart models.Cart
-
-		if err := tx.
-			Preload("Items.MenuItem").
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("user_id = ?", userID).
 			First(&cart).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -95,84 +45,106 @@ func (r *PostgresOrderRepo) PlaceOrder(
 			return err
 		}
 
+		if err := tx.Preload("MenuItem").Where("cart_id = ?", cart.ID).Find(&cart.Items).Error; err != nil {
+			return err
+		}
 		if len(cart.Items) == 0 || cart.RestaurantID == nil {
 			return ErrEmptyCart
 		}
 
-		// Check that the restaurant is active.
 		var restaurant models.Restaurant
 		if err := tx.First(&restaurant, *cart.RestaurantID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrInactiveRestaurant
+			}
 			return err
 		}
 		if restaurant.Status != models.RestaurantStatusActive {
 			return ErrInactiveRestaurant
 		}
 
-		// Check availability and calculate the subtotal.
+		orderItems := make([]models.OrderItem, 0, len(cart.Items))
 		var subtotal int64
-
-		for _, cartItem := range cart.Items {
-			menuItem := cartItem.MenuItem
-
-			if !menuItem.Available ||
-				menuItem.RestaurantID != *cart.RestaurantID {
+		for _, line := range cart.Items {
+			if line.MenuItem.ID == 0 || !line.MenuItem.Available || line.MenuItem.RestaurantID != *cart.RestaurantID {
 				return ErrUnavailableItem
 			}
-
-			subtotal += menuItem.Price * int64(cartItem.Quantity)
-		}
-
-		// Copy the purchased items into the order.
-		orderItems := make([]models.OrderItem, 0, len(cart.Items))
-
-		for _, cartItem := range cart.Items {
-			menuItem := cartItem.MenuItem
-
+			lineTotal := line.Price * int64(line.Quantity)
+			subtotal += lineTotal
 			orderItems = append(orderItems, models.OrderItem{
-				MenuItemID: cartItem.MenuItemID,
-				Name:       menuItem.Name,
-				UnitPrice:  menuItem.Price,
-				Quantity:   cartItem.Quantity,
-				LineTotal:  menuItem.Price * int64(cartItem.Quantity),
+				MenuItemID: line.MenuItemID,
+				Name:       line.MenuItem.Name,
+				UnitPrice:  line.Price,
+				Quantity:   line.Quantity,
+				LineTotal:  lineTotal,
 			})
 		}
 
-		// Prepare the order using the existing checkout rules.
-		randomBytes := make([]byte, 8)
-		if _, err := rand.Read(randomBytes); err != nil {
+		var seq struct {
+			OrderDate  time.Time `gorm:"column:order_date"`
+			LastNumber int       `gorm:"column:last_number"`
+		}
+		if err := tx.Raw(`
+			INSERT INTO order_daily_sequences (order_date, last_number)
+			VALUES (CURRENT_DATE, 1)
+			ON CONFLICT (order_date)
+			DO UPDATE SET last_number = order_daily_sequences.last_number + 1
+			RETURNING order_date, last_number
+		`).Scan(&seq).Error; err != nil {
 			return err
 		}
+		if seq.LastNumber < 1 {
+			return errors.New("order number sequence did not advance")
+		}
 
-		order.OrderNumber = "ORD-" + hex.EncodeToString(randomBytes)
+		order.OrderNumber = fmt.Sprintf("ORD-%s-%03d", seq.OrderDate.UTC().Format("20060102"), seq.LastNumber)
 		order.CustomerID = userID
 		order.RestaurantID = *cart.RestaurantID
 		order.Status = models.OrderStatusPending
+		order.DeliveryFee = 0
 		order.Subtotal = subtotal
-		order.Total = subtotal + order.DeliveryFee
+		order.Total = subtotal
 		order.Items = orderItems
 
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
-
-		// Clear the cart after saving the order.
-		if err := tx.Where("cart_id = ?", cart.ID).
-			Delete(&models.CartItem{}).Error; err != nil {
+		if err := tx.Where("cart_id = ?", cart.ID).Delete(&models.CartItem{}).Error; err != nil {
 			return err
 		}
-
-		if err := tx.Model(&cart).
-			Update("restaurant_id", nil).Error; err != nil {
+		if err := tx.Model(&cart).Updates(map[string]any{"restaurant_id": nil}).Error; err != nil {
 			return err
 		}
 
 		result = order
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
+}
+
+func (r *PostgresOrderRepo) FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).
+		Model(&models.Order{}).
+		Where("customer_id = ?", customerID).
+		Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orders := make([]models.Order, 0)
+	err = r.db.WithContext(ctx).
+		Preload("Restaurant").
+		Where("customer_id = ?", customerID).
+		Order("created_at DESC, id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&orders).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
 }

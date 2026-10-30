@@ -19,6 +19,8 @@ type CartRepository interface {
 		quantity int,
 		price int64,
 	) (*models.CartItem, error)
+
+	FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error)
 }
 
 const MaxCartLineQuantity = 99
@@ -35,6 +37,20 @@ var (
 	ErrDifferentRestaurant = errors.New("cart contains items from another restaurant")
 	ErrCartLineFull        = errors.New("quantity cannot exceed 99")
 )
+
+func (r *PostgresCartRepo) FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error) {
+	var cart models.Cart
+	err := r.db.WithContext(ctx).
+		Preload("Restaurant").
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("Items.MenuItem").
+		Where("user_id = ?", userID).
+		First(&cart).Error
+	if err != nil {
+		return nil, err
+	}
+	return &cart, nil
+}
 
 func (r *PostgresCartRepo) AddItem(
 	ctx context.Context,

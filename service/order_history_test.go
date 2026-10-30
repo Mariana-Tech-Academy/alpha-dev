@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"alpha-dev/models"
+	"alpha-dev/repository"
 
 	"gorm.io/gorm"
 )
 
-// Record what the service asks the repository to retrieve.
 type orderHistoryRepoStub struct {
 	orders     []models.Order
 	total      int64
@@ -22,121 +22,102 @@ type orderHistoryRepoStub struct {
 	called     bool
 }
 
-func (f *orderHistoryRepoStub) PlaceOrder(
-	context.Context,
-	uint,
-	*models.Order,
-) (*models.Order, error) {
+func (f *orderHistoryRepoStub) PlaceOrder(context.Context, uint, *models.Order) (*models.Order, error) {
 	return nil, errors.New("checkout is not used in these tests")
 }
 
-func (f *orderHistoryRepoStub) FindCustomerOrders(
-	_ context.Context,
-	customerID uint,
-	limit int,
-	offset int,
-) ([]models.Order, int64, error) {
+func (f *orderHistoryRepoStub) FindCustomerOrders(_ context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error) {
 	f.called = true
 	f.customerID = customerID
 	f.limit = limit
 	f.offset = offset
-
 	return f.orders, f.total, f.err
 }
 
+var _ repository.OrderRepository = (*orderHistoryRepoStub)(nil)
+
 func TestOrderHistoryReturnsRequestedPage(t *testing.T) {
 	date := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
-
 	repo := &orderHistoryRepoStub{
 		total: 3,
-		orders: []models.Order{
-			{
-				Model:        gorm.Model{ID: 7, CreatedAt: date},
-				OrderNumber:  "ORD-TEST-7",
-				CustomerID:   4,
-				RestaurantID: 2,
-				Restaurant:   models.Restaurant{Name: "Test Restaurant"},
-				Total:        1500,
-				Status:       models.OrderStatusDelivered,
-			},
-		},
+		orders: []models.Order{{
+			Model:        gorm.Model{ID: 7, CreatedAt: date},
+			OrderNumber:  "ORD-TEST-7",
+			CustomerID:   4,
+			RestaurantID: 2,
+			Restaurant:   models.Restaurant{Name: "Test Restaurant"},
+			Total:        1500,
+			Status:       models.OrderStatusDelivered,
+		}},
 	}
 
-	history, err := NewOrderService(repo).GetOrderHistory(
-		context.Background(), 4, 2, 2,
-	)
+	history, err := NewOrderService(repo).GetOrderHistory(context.Background(), 4, 2, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// The repository must receive the logged-in customer's ID.
 	if repo.customerID != 4 || repo.limit != 2 || repo.offset != 2 {
-		t.Fatalf("wrong customer or page: %+v", repo)
+		t.Fatalf("wrong customer or page: customer %d limit %d offset %d", repo.customerID, repo.limit, repo.offset)
 	}
-
 	if history.Page != 2 || history.Limit != 2 || history.Total != 3 {
 		t.Fatalf("wrong pagination: %+v", history)
 	}
-
 	if len(history.Orders) != 1 {
 		t.Fatalf("expected one order, got %d", len(history.Orders))
 	}
-
 	item := history.Orders[0]
-	if item.ID != 7 ||
-		item.OrderNumber != "ORD-TEST-7" ||
-		item.RestaurantID != 2 ||
-		item.RestaurantName != "Test Restaurant" ||
-		item.Total != 1500 ||
-		item.Status != models.OrderStatusDelivered ||
-		!item.CreatedAt.Equal(date) {
+	if item.ID != 7 || item.OrderNumber != "ORD-TEST-7" || item.RestaurantID != 2 || item.RestaurantName != "Test Restaurant" || item.Total != 1500 || item.Status != models.OrderStatusDelivered || !item.CreatedAt.Equal(date) {
 		t.Fatalf("wrong history details: %+v", item)
 	}
 }
 
-func TestOrderHistoryRejectsInvalidRequests(t *testing.T) {
+func TestOrderHistoryClampsPageSize(t *testing.T) {
 	tests := []struct {
 		name       string
-		customerID uint
 		page       int
 		limit      int
-		want       error
+		wantPage   int
+		wantLimit  int
+		wantOffset int
 	}{
-		{"missing customer", 0, 1, 10, ErrOrderHistoryUnauthenticated},
-		{"zero page", 4, 0, 10, ErrOrderHistoryPagination},
-		{"negative page", 4, -1, 10, ErrOrderHistoryPagination},
-		{"zero limit", 4, 1, 0, ErrOrderHistoryPagination},
-		{"large limit", 4, 1, 101, ErrOrderHistoryPagination},
+		{"zero page", 0, 10, 1, 10, 0},
+		{"negative page", -1, 10, 1, 10, 0},
+		{"zero limit", 1, 0, 1, 10, 0},
+		{"large limit", 1, 101, 1, 20, 0},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repo := &orderHistoryRepoStub{}
-
-			_, err := NewOrderService(repo).GetOrderHistory(
-				context.Background(),
-				test.customerID,
-				test.page,
-				test.limit,
-			)
-
-			if !errors.Is(err, test.want) {
-				t.Fatalf("expected %v, got %v", test.want, err)
+			history, err := NewOrderService(repo).GetOrderHistory(context.Background(), 4, test.page, test.limit)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			if repo.called {
-				t.Fatal("invalid request reached the repository")
+			if history.Page != test.wantPage || history.Limit != test.wantLimit {
+				t.Fatalf("page %d limit %d", history.Page, history.Limit)
+			}
+			if repo.offset != test.wantOffset || repo.limit != test.wantLimit {
+				t.Fatalf("repository offset %d limit %d", repo.offset, repo.limit)
 			}
 		})
 	}
 }
 
+func TestOrderHistoryRejectsMissingCustomer(t *testing.T) {
+	repo := &orderHistoryRepoStub{}
+	_, err := NewOrderService(repo).GetOrderHistory(context.Background(), 0, 1, 10)
+	if !errors.Is(err, ErrInvalidUser) {
+		t.Fatalf("expected unauthenticated, got %v", err)
+	}
+	if repo.called {
+		t.Fatal("missing customer reached the repository")
+	}
+}
+
 func TestOrderHistoryReturnsEmptyList(t *testing.T) {
-	history, err := NewOrderService(&orderHistoryRepoStub{}).
-		GetOrderHistory(context.Background(), 4, 1, 10)
+	history, err := NewOrderService(&orderHistoryRepoStub{}).GetOrderHistory(context.Background(), 4, 1, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if history.Orders == nil || len(history.Orders) != 0 {
 		t.Fatal("expected an empty list")
 	}
@@ -144,11 +125,7 @@ func TestOrderHistoryReturnsEmptyList(t *testing.T) {
 
 func TestOrderHistoryReturnsDatabaseError(t *testing.T) {
 	databaseErr := errors.New("database unavailable")
-	repo := &orderHistoryRepoStub{err: databaseErr}
-
-	_, err := NewOrderService(repo).GetOrderHistory(
-		context.Background(), 4, 1, 10,
-	)
+	_, err := NewOrderService(&orderHistoryRepoStub{err: databaseErr}).GetOrderHistory(context.Background(), 4, 1, 10)
 	if !errors.Is(err, databaseErr) {
 		t.Fatalf("expected database error, got %v", err)
 	}
