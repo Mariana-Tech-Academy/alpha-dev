@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"alpha-dev/models"
 	"alpha-dev/repository"
 
@@ -83,87 +85,68 @@ func (s *cartService) AddItem(ctx context.Context, userID uint, menuItemID uint,
 	return item, nil
 }
 
+func emptyCartView() *models.CartViewResponse {
+	return &models.CartViewResponse{Items: []models.CartItemResponse{}}
+}
+
 func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.CartViewResponse, error) {
 	if userID == 0 {
-		return nil, errors.New("invalid user ID")
+		return nil, ErrInvalidUser
 	}
 
-	// Call the repository to fetch the cart for the user
 	cart, err := s.cartRepo.FindCartByUserID(ctx, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return emptyCartView(), nil
+	}
 	if err != nil {
-		// If the cart is not found, return an empty cart view response instead of an error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return &models.CartViewResponse{
-				CartID:       0,
-				RestaurantID: nil,
-				Items:        []models.CartItemResponse{},
-				Subtotal:     0.0,
-			}, nil
-		}
-		// For other errors, return the error
 		return nil, err
 	}
-
-	// If the user doesn't have an active cart yet, return an empty response cleanly
 	if cart == nil {
+		return emptyCartView(), nil
+	}
+	if len(cart.Items) == 0 {
 		return &models.CartViewResponse{
-			Items:    []models.CartItemResponse{},
-			Subtotal: 0,
+			CartID:       cart.ID,
+			RestaurantID: cart.RestaurantID,
+			Items:        []models.CartItemResponse{},
 		}, nil
 	}
 
-	var responseItems []models.CartItemResponse
-	var subtotal float64 = 0
-	// Iterate through the cart items to build the response
+	restaurantOpen := cart.Restaurant != nil && cart.RestaurantID != nil && cart.Restaurant.Status == models.RestaurantStatusActive
+	items := make([]models.CartItemResponse, 0, len(cart.Items))
+	var subtotal int64
 	for _, item := range cart.Items {
-		menuItem := item.MenuItem
-
-		currentPrice := float64(menuItem.Price) / 100.0 // Convert from minor units to major units (e.g., pence to pounds)
-		lockedPrice := float64(item.Price) / 100.0
-		isAvailable := menuItem.Available
-		// Acceptance Criteria: Build CartItemResponse
-		itemResp := models.CartItemResponse{
-			MenuItemID:   item.MenuItemID,
-			Name:         menuItem.Name,
-			Price:        currentPrice,
-			LockedPrice:  lockedPrice,
-			Quantity:     item.Quantity,
-			IsAvailable:  isAvailable,
-			PriceChanged: false,
+		live := item.MenuItem.Price
+		locked := item.Price
+		available := restaurantOpen && item.MenuItem.ID != 0 && item.MenuItem.Available && item.MenuItem.RestaurantID == *cart.RestaurantID
+		row := models.CartItemResponse{
+			MenuItemID:  item.MenuItemID,
+			Name:        item.MenuItem.Name,
+			Price:       live,
+			LockedPrice: locked,
+			Quantity:    item.Quantity,
+			IsAvailable: available,
 		}
-
-		//  Availability notice
-		if !isAvailable {
-			itemResp.Notice = "This item is currently unavailable."
+		var notices []string
+		if !available {
+			notices = append(notices, "This item is currently unavailable.")
 		}
-
-		// Price change notice
-		if lockedPrice != currentPrice {
-			itemResp.PriceChanged = true
-			priceNotice := fmt.Sprintf("Price changed from £%.2f to £%.2f.", lockedPrice, currentPrice)
-			if itemResp.Notice != "" {
-				itemResp.Notice += " " + priceNotice
-			} else {
-				itemResp.Notice = priceNotice
-			}
+		if item.MenuItem.ID != 0 && live != locked {
+			row.PriceChanged = true
+			notices = append(notices, fmt.Sprintf("Price changed from %d to %d.", locked, live))
 		}
-
-		// Calculate line total and add to subtotal (only if available)
-		if isAvailable {
-			lineTotal := currentPrice * float64(item.Quantity)
-			itemResp.LineTotal = lineTotal
-			subtotal += lineTotal
-		} else {
-			itemResp.LineTotal = 0.0
+		row.Notice = strings.Join(notices, " ")
+		if available {
+			row.LineTotal = locked * int64(item.Quantity)
+			subtotal += row.LineTotal
 		}
-		// Append the item response to the list
-		responseItems = append(responseItems, itemResp)
+		items = append(items, row)
 	}
-	// Build the final CartViewResponse
+
 	return &models.CartViewResponse{
 		CartID:       cart.ID,
 		RestaurantID: cart.RestaurantID,
-		Items:        responseItems,
+		Items:        items,
 		Subtotal:     subtotal,
 	}, nil
 }
