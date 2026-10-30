@@ -96,4 +96,14 @@ erDiagram
 ## Decisions the team still needs to document
 
 - **Cart conflict rule (PRD 4.4):** reject adding an item from a different restaurant, or ask the customer to clear the cart.
-- **Cancellation rule (PRD 4.8):** which statuses allow cancellation and who may cancel.
+
+## Cancellation rule (PRD 4.8, decided)
+
+- **Last status from which cancellation is allowed: `confirmed`.** Orders that are `pending` or `confirmed` can be cancelled.
+  From `preparing` onwards, `POST /api/orders/{id}/cancel` returns **409** `order can no longer be cancelled`.
+  The rule is the `models.CancellableStatuses` list; change it there and everything else follows.
+- **Who can cancel:** the customer who placed the order, the manager of the order's restaurant, or an admin.
+  Anyone else gets **403** `you cannot cancel this order`.
+- **Cancelled is final.** Cancelling it again returns **409** `order is already cancelled`, and no endpoint moves an order out of `cancelled` (or `delivered`).
+- **Sales totals exclude cancelled orders.** Every sales total must use the `repository.CountedAsSales` scope.
+- The status check is inside the `UPDATE ... WHERE status IN (...)`, so a cancel that races with a move to `preparing` is rejected, never applied.

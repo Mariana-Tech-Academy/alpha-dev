@@ -21,6 +21,16 @@ func (u unusedOrderRepo) PlaceOrder(context.Context, uint, *models.Order) (*mode
 	return nil, nil
 }
 
+func (u unusedOrderRepo) FindOrderByID(context.Context, uint) (*models.Order, error) {
+	u.t.Fatal("FindOrderByID should not be called")
+	return nil, nil
+}
+
+func (u unusedOrderRepo) CancelOrder(context.Context, uint) error {
+	u.t.Fatal("CancelOrder should not be called")
+	return nil
+}
+
 func TestPlaceOrderInvalidDeliveryReturns422(t *testing.T) {
 	handler := NewOrderHandler(service.NewOrderService(unusedOrderRepo{t}))
 

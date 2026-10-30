@@ -57,6 +57,7 @@ type PlacedOrder struct {
 
 type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
+	CancelOrder(ctx context.Context, userID uint, role models.Role, orderID uint) (CancelledOrder, error)
 }
 
 type orderService struct {

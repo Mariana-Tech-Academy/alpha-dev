@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"slices"
+
+	"gorm.io/gorm"
+)
 
 type OrderStatus string
 
@@ -36,4 +40,13 @@ type Order struct {
 	DeliveryInstructions string `json:"delivery_instructions"`
 
 	Items []OrderItem `json:"items"`
+}
+
+// Team rule (PRD 4.8): an order can be cancelled while it is pending or confirmed.
+// "confirmed" is the last status from which cancelling is allowed.
+var CancellableStatuses = []OrderStatus{OrderStatusPending, OrderStatusConfirmed}
+
+// CanBeCancelled reports whether an order in this status can still be cancelled.
+func (s OrderStatus) CanBeCancelled() bool {
+	return slices.Contains(CancellableStatuses, s)
 }

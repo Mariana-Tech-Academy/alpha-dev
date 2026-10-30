@@ -14,6 +14,8 @@ import (
 
 type OrderRepository interface {
 	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
+	FindOrderByID(ctx context.Context, id uint) (*models.Order, error)
+	CancelOrder(ctx context.Context, id uint) error
 }
 
 type PostgresOrderRepo struct {

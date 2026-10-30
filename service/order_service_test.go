@@ -32,6 +32,14 @@ func (f *fakeOrderRepo) PlaceOrder(_ context.Context, _ uint, order *models.Orde
 	return order, nil
 }
 
+func (f *fakeOrderRepo) FindOrderByID(context.Context, uint) (*models.Order, error) {
+	return nil, errors.New("not used in place order tests")
+}
+
+func (f *fakeOrderRepo) CancelOrder(context.Context, uint) error {
+	return errors.New("not used in place order tests")
+}
+
 var _ repository.OrderRepository = (*fakeOrderRepo)(nil)
 
 func validDelivery() PlaceOrderRequest {
