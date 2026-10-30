@@ -16,6 +16,10 @@ import (
 
 type unusedOrderRepo struct{ t *testing.T }
 
+func (u unusedOrderRepo) FindCustomerOrders(context.Context, uint, int, int) ([]models.Order, int64, error) {
+	return nil, 0, nil
+}
+
 func (u unusedOrderRepo) PlaceOrder(context.Context, uint, *models.Order) (*models.Order, error) {
 	u.t.Fatal("repository called with invalid delivery details")
 	return nil, nil

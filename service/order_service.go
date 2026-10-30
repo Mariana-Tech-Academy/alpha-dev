@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"alpha-dev/models"
 	"alpha-dev/repository"
@@ -55,8 +56,28 @@ type PlacedOrder struct {
 	Items       []PlacedOrderItem  `json:"items"`
 }
 
+type OrderHistoryItem struct {
+	ID             uint               `json:"id"`
+	OrderNumber    string             `json:"order_number"`
+	RestaurantID   uint               `json:"restaurant_id"`
+	RestaurantName string             `json:"restaurant_name"`
+	Total          int64              `json:"total"`
+	Status         models.OrderStatus `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+}
+
+type OrderHistory struct {
+	Orders []OrderHistoryItem `json:"orders"`
+	Page   int                `json:"page"`
+	Limit  int                `json:"limit"`
+	Total  int64              `json:"total"`
+}
+
+const maxOrderPageSize = 20
+
 type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
+	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
 }
 
 type orderService struct {
@@ -152,5 +173,44 @@ func (s *orderService) PlaceOrder(ctx context.Context, userID uint, req PlaceOrd
 		DeliveryFee: placed.DeliveryFee,
 		Total:       placed.Total,
 		Items:       items,
+	}, nil
+}
+
+func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error) {
+	if customerID == 0 {
+		return OrderHistory{}, ErrInvalidUser
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > maxOrderPageSize {
+		limit = maxOrderPageSize
+	}
+
+	orders, total, err := s.orderRepo.FindCustomerOrders(ctx, customerID, limit, (page-1)*limit)
+	if err != nil {
+		return OrderHistory{}, err
+	}
+
+	items := make([]OrderHistoryItem, 0, len(orders))
+	for _, order := range orders {
+		items = append(items, OrderHistoryItem{
+			ID:             order.ID,
+			OrderNumber:    order.OrderNumber,
+			RestaurantID:   order.RestaurantID,
+			RestaurantName: order.Restaurant.Name,
+			Total:          order.Total,
+			Status:         order.Status,
+			CreatedAt:      order.CreatedAt,
+		})
+	}
+	return OrderHistory{
+		Orders: items,
+		Page:   page,
+		Limit:  limit,
+		Total:  total,
 	}, nil
 }

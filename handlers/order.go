@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"alpha-dev/auth"
 	"alpha-dev/service"
@@ -61,4 +62,38 @@ func (h *OrderHandler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.Success(w, http.StatusCreated, "order placed", placed)
+}
+
+func (h *OrderHandler) GetOrderHistory(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	history, err := h.OrderService.GetOrderHistory(r.Context(), claims.UserID, page, limit)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidUser) {
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+			return
+		}
+		log.Printf("order history: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "unable to load order history")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "orders retrieved", history)
 }
