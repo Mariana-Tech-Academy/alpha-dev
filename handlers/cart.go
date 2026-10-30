@@ -94,3 +94,24 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 		"price":        item.Price,
 	})
 }
+
+func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	cartView, err := h.CartService.GetCartView(r.Context(), claims.UserID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidUser) {
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+			return
+		}
+		log.Printf("get cart: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "unable to retrieve cart")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "cart retrieved successfully", cartView)
+}

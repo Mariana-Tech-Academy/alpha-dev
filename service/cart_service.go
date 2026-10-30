@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"alpha-dev/models"
 	"alpha-dev/repository"
@@ -22,6 +24,7 @@ var (
 
 type CartService interface {
 	AddItem(ctx context.Context, userID uint, menuItemID uint, quantity int) (*models.CartItem, error)
+	GetCartView(ctx context.Context, userID uint) (*models.CartViewResponse, error)
 }
 
 type cartService struct {
@@ -80,4 +83,70 @@ func (s *cartService) AddItem(ctx context.Context, userID uint, menuItemID uint,
 		return nil, err
 	}
 	return item, nil
+}
+
+func emptyCartView() *models.CartViewResponse {
+	return &models.CartViewResponse{Items: []models.CartItemResponse{}}
+}
+
+func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.CartViewResponse, error) {
+	if userID == 0 {
+		return nil, ErrInvalidUser
+	}
+
+	cart, err := s.cartRepo.FindCartByUserID(ctx, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return emptyCartView(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cart == nil {
+		return emptyCartView(), nil
+	}
+	if len(cart.Items) == 0 {
+		return &models.CartViewResponse{
+			CartID:       cart.ID,
+			RestaurantID: cart.RestaurantID,
+			Items:        []models.CartItemResponse{},
+		}, nil
+	}
+
+	restaurantOpen := cart.Restaurant != nil && cart.RestaurantID != nil && cart.Restaurant.Status == models.RestaurantStatusActive
+	items := make([]models.CartItemResponse, 0, len(cart.Items))
+	var subtotal int64
+	for _, item := range cart.Items {
+		live := item.MenuItem.Price
+		locked := item.Price
+		available := restaurantOpen && item.MenuItem.ID != 0 && item.MenuItem.Available && item.MenuItem.RestaurantID == *cart.RestaurantID
+		row := models.CartItemResponse{
+			MenuItemID:  item.MenuItemID,
+			Name:        item.MenuItem.Name,
+			Price:       live,
+			LockedPrice: locked,
+			Quantity:    item.Quantity,
+			IsAvailable: available,
+		}
+		var notices []string
+		if !available {
+			notices = append(notices, "This item is currently unavailable.")
+		}
+		if item.MenuItem.ID != 0 && live != locked {
+			row.PriceChanged = true
+			notices = append(notices, fmt.Sprintf("Price changed from %d to %d.", locked, live))
+		}
+		row.Notice = strings.Join(notices, " ")
+		if available {
+			row.LineTotal = locked * int64(item.Quantity)
+			subtotal += row.LineTotal
+		}
+		items = append(items, row)
+	}
+
+	return &models.CartViewResponse{
+		CartID:       cart.ID,
+		RestaurantID: cart.RestaurantID,
+		Items:        items,
+		Subtotal:     subtotal,
+	}, nil
 }
