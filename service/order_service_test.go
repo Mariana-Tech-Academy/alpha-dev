@@ -15,6 +15,10 @@ type fakeOrderRepo struct {
 	saved *models.Order
 }
 
+func (f *fakeOrderRepo) FindCustomerOrders(context.Context, uint, int, int) ([]models.Order, int64, error) {
+	return nil, 0, errors.New("not used")
+}
+
 func (f *fakeOrderRepo) PlaceOrder(_ context.Context, _ uint, order *models.Order) (*models.Order, error) {
 	copied := *order
 	f.saved = &copied

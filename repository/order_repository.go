@@ -14,6 +14,7 @@ import (
 
 type OrderRepository interface {
 	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
+	FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error)
 }
 
 type PostgresOrderRepo struct {
@@ -122,4 +123,28 @@ func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *
 		return nil, err
 	}
 	return result, nil
+}
+
+func (r *PostgresOrderRepo) FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).
+		Model(&models.Order{}).
+		Where("customer_id = ?", customerID).
+		Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orders := make([]models.Order, 0)
+	err = r.db.WithContext(ctx).
+		Preload("Restaurant").
+		Where("customer_id = ?", customerID).
+		Order("created_at DESC, id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&orders).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
 }
