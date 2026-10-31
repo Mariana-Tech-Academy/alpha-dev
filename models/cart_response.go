@@ -1,8 +1,8 @@
 package models
 
-// Cart money fields are minor units, so 1250 means 12.50.
-// Price is the live menu price. LockedPrice is the price stored when the item was added.
+// Prices are stored in minor units: 1250 means 12.50.
 type CartItemResponse struct {
+	ID           uint   `json:"id"`
 	MenuItemID   uint   `json:"menu_item_id"`
 	Name         string `json:"name"`
 	Price        int64  `json:"price"`
