@@ -10,6 +10,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
+	"net/http"
+
+	
 )
 
 func OrderRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
@@ -28,6 +31,7 @@ func OrderRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	// manager/admin routes: PATCH /orders/{id}/status
 	staff := protected(router, tokens)
 	staff.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
+	staff.HandleFunc("/orders/{id}/status", orderHandler.UpdateOrderStatus).Methods(http.MethodPatch)
 
 	_, _, _, _ = orderHandler, customer, authed, staff
 }

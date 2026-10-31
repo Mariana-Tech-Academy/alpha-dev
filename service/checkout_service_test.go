@@ -1,5 +1,7 @@
 package service
 
+//service/checkout_service_test.go checks that Summary behaves correctly without needing a database or a running server.
+
 import (
 	"context"
 	"errors"
@@ -23,11 +25,12 @@ type fakeCheckoutCartRepo struct {
 	cart *models.Cart
 	err  error
 }
-
+//This is the fake version of “go and get the cart”. It doesn’t look anything up. It just returns whatever is in the two boxes.
 func (f *fakeCheckoutCartRepo) FindCartByUserID(context.Context, uint) (*models.Cart, error) {
 	return f.cart, f.err
 }
 
+//A cart item takes several lines to build, and Question 1 needs two of them. This helper builds one from four short values.
 func cartLine(menuItemID uint, name string, qty int, price int64) models.CartItem {
 	return models.CartItem{
 		MenuItemID: menuItemID,
@@ -47,6 +50,7 @@ func TestCheckoutSummary(t *testing.T) {
 			cartLine(1, "Jollof Rice", 2, 450000),
 			cartLine(2, "Fried Chicken", 1, 550000),
 		}}
+		//creating the service that uses the fake store room
 		got, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 200000).Summary(context.Background(), 4)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

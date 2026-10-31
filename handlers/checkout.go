@@ -3,6 +3,10 @@ package handlers
 //handlers/checkout.go is the code that runs when someone calls GET /api/checkout/summary
 //It receives the HTTP request, calls the service, and sends back the HTTP response. It does no calculations and no database work.
 
+//Read the incoming request.
+//Ask the service to do the real work.
+//Turn the result into an HTTP response.
+
 import (
 	"errors"
 	"log"
@@ -22,6 +26,7 @@ func NewCheckoutHandler(s service.CheckoutService) *CheckoutHandler {
 	return &CheckoutHandler{CheckoutService: s}
 }
 // Summary handles GET /checkout/summary (CHK-01).
+//(h *CheckoutHandler) means this function belongs to the handler, so it can use h.CheckoutService
 func (h *CheckoutHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	//The auth middleware has already read the customer’s login token and stored the user’s details on the request. This line reads them back out. If they aren’t there, it responds with 401 Unauthorized and stops.
 	claims, err := auth.ClaimsFromContext(r.Context())

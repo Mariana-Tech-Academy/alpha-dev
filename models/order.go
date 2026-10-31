@@ -14,6 +14,35 @@ const (
 	OrderStatusCancelled        OrderStatus = "cancelled"
 )
 
+// orderFlow maps each status to the only status allowed to follow it.
+// Delivered and cancelled have no entry, which makes them final.
+var orderFlow = map[OrderStatus]OrderStatus{
+	OrderStatusPending:          OrderStatusConfirmed,
+	OrderStatusConfirmed:        OrderStatusPreparing,
+	OrderStatusPreparing:        OrderStatusReadyForDelivery,
+	OrderStatusReadyForDelivery: OrderStatusOutForDelivery,
+	OrderStatusOutForDelivery:   OrderStatusDelivered,
+}
+
+//func (s OrderStatus) IsValid() is a method on a type. OrderStatus is a custom type built on string (type OrderStatus string), and Go lets you attach behaviour to your own types. You can then write status.IsValid().
+
+//switch s { case A, B, C: return true } lists all seven statuses on one case line. Anything else falls out of the switch to return false, which catches junk like "teleported".
+func (s OrderStatus) IsValid() bool {
+	switch s {
+	case OrderStatusPending, OrderStatusConfirmed, OrderStatusPreparing,
+		OrderStatusReadyForDelivery, OrderStatusOutForDelivery,
+		OrderStatusDelivered, OrderStatusCancelled:
+		return true
+	}
+	return false
+}
+
+//named return values
+func (s OrderStatus) Next() (next OrderStatus, ok bool) {
+	next, ok = orderFlow[s]
+	return next, ok
+}
+
 // Delivery fields are a snapshot taken at checkout; they must not reference the user's profile.
 type Order struct {
 	gorm.Model

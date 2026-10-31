@@ -1,5 +1,9 @@
 package repository
 
+//Request → handler → service → repository → database
+
+//repository/cart_repository.go is the only file that talks to the database for cart data.
+
 import (
 	"context"
 	"errors"
@@ -24,7 +28,7 @@ type CartRepository interface {
 }
 
 const MaxCartLineQuantity = 99
-
+// holds connection to database
 type PostgresCartRepo struct {
 	db *gorm.DB
 }
@@ -45,8 +49,12 @@ func (r *PostgresCartRepo) FindCartByUserID(ctx context.Context, userID uint) (*
 		Preload("Restaurant"). //loads restaurant
 		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).// cart's Items in ascending order
 		Preload("Items.MenuItem").//menu item inside each cart 
-		Where("user_id = ?", userID).//finds the cart belonging to this customer. The ? is a placeholder. GORM fills in the value safely, which protects against SQL injection, so never build the string by hand.
+		Where("user_id = ?", userID).//finds the cart belonging to this customer. The ? is a placeholder. GORM fills in the value safely with the value you pass next to it, which protects against SQL injection, so never build the string by hand.
 		First(&cart).Error //fetches one row into the cart variable. If there is no row, it returns gorm.ErrRecordNotFound
+
+		/*
+		SQL injection is when an attacker types SQL code into an input box (like a login form) and your app runs it as part of its database query, letting them read or change data they shouldn’t
+		*/
 	if err != nil {
 		return nil, err
 	}
