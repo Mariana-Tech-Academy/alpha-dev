@@ -21,6 +21,7 @@ type CartRepository interface {
 	) (*models.CartItem, error)
 
 	FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error)
+	UpdateQuantity(ctx context.Context, userID uint, itemID uint, quantity int) error
 }
 
 const MaxCartLineQuantity = 99
@@ -60,11 +61,9 @@ func (r *PostgresCartRepo) AddItem(
 	quantity int,
 	price int64,
 ) (*models.CartItem, error) {
-
 	var result models.CartItem
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-
 		// Create the customer's cart if it does not exist.
 		cart := models.Cart{
 			UserID: userID,
@@ -153,4 +152,33 @@ func (r *PostgresCartRepo) AddItem(
 	}
 
 	return &result, nil
+}
+
+// Update an item only within the logged-in customer's cart.
+func (r *PostgresCartRepo) UpdateQuantity(
+	ctx context.Context,
+	userID uint,
+	itemID uint,
+	quantity int,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var cart models.Cart
+
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ?", userID).
+			First(&cart).Error
+		if err != nil {
+			return err
+		}
+
+		var item models.CartItem
+		err = tx.Where("id = ? AND cart_id = ?", itemID, cart.ID).
+			First(&item).Error
+		if err != nil {
+			return err
+		}
+
+		// Keep the saved price and change only the quantity.
+		return tx.Model(&item).Update("quantity", quantity).Error
+	})
 }

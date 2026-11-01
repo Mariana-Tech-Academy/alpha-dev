@@ -9,14 +9,33 @@ import (
 
 	"alpha-dev/models"
 	"alpha-dev/repository"
+
+	"gorm.io/gorm"
 )
 
 var (
 	ErrEmptyCart                  = errors.New("your cart is empty")
 	ErrCheckoutRestaurantInactive = errors.New("restaurant is not active")
 	ErrCheckoutItemUnavailable    = errors.New("one or more menu items are unavailable")
+	ErrOrderNotFound              = errors.New("order not found")
+	ErrOrderForbidden             = errors.New("you cannot manage orders for this restaurant")
+	ErrInvalidOrderStatus         = errors.New("status must be one of: pending, confirmed, preparing, ready_for_delivery, out_for_delivery, delivered, cancelled")
+	ErrOrderChanged               = errors.New("order changed; refresh and try again")
 	ErrNoRestaurantManaged        = errors.New("no restaurant assigned to this manager")
 )
+
+type OrderTransitionError struct {
+	From    models.OrderStatus
+	To      models.OrderStatus
+	Allowed models.OrderStatus
+}
+
+func (e *OrderTransitionError) Error() string {
+	if e.Allowed == "" {
+		return fmt.Sprintf("order is %s; no further status change is allowed", e.From)
+	}
+	return fmt.Sprintf("cannot change order from %s to %s; the only allowed next status is %s", e.From, e.To, e.Allowed)
+}
 
 const (
 	maxDeliveryNameLength         = 100
@@ -77,9 +96,17 @@ type OrderHistory struct {
 
 const maxOrderPageSize = 20
 
+type UpdatedOrder struct {
+	ID          uint               `json:"id"`
+	OrderNumber string             `json:"order_number"`
+	Status      models.OrderStatus `json:"status"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
 type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
 	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
+	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error)
 	GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error)
 }
 
@@ -218,67 +245,107 @@ func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, pag
 	}, nil
 }
 
-func (s *orderService) GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error) {
-	// Retrieve the restaurant ID managed by this manager
-	restaurantID, err := s.orderRepo.GetRestaurantIDByManager(ctx, managerID)
+func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error) {
+	if userID == 0 {
+		return UpdatedOrder{}, ErrInvalidUser
+	}
+	if role != models.RoleManager && role != models.RoleAdmin {
+		return UpdatedOrder{}, ErrOrderForbidden
+	}
+	if !next.IsValid() {
+		return UpdatedOrder{}, ErrInvalidOrderStatus
+	}
+
+	order, err := s.orderRepo.FindByID(ctx, orderID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return UpdatedOrder{}, ErrOrderNotFound
+	}
 	if err != nil {
-		if errors.Is(err, repository.ErrRestaurantNotFound) {
-			return nil, ErrNoRestaurantManaged
+		return UpdatedOrder{}, err
+	}
+	if role == models.RoleManager && order.Restaurant.ManagerID != userID {
+		return UpdatedOrder{}, ErrOrderForbidden
+	}
+
+	allowed, ok := order.Status.Next()
+	if !ok || next != allowed {
+		return UpdatedOrder{}, &OrderTransitionError{From: order.Status, To: next, Allowed: allowed}
+	}
+
+	updated, err := s.orderRepo.UpdateStatus(ctx, order.ID, order.Status, next)
+	if err != nil {
+		return UpdatedOrder{}, err
+	}
+	if !updated {
+		return UpdatedOrder{}, ErrOrderChanged
+	}
+
+	fresh, err := s.orderRepo.FindByID(ctx, order.ID)
+	if err != nil {
+		return UpdatedOrder{}, err
+	}
+	return UpdatedOrder{
+		ID:          fresh.ID,
+		OrderNumber: fresh.OrderNumber,
+		Status:      fresh.Status,
+		UpdatedAt:   fresh.UpdatedAt,
+	}, nil
+}
+
+func (s *orderService) GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error) {
+	if managerID == 0 {
+		return nil, ErrInvalidUser
+	}
+
+	var status models.OrderStatus
+	if strings.TrimSpace(statusStr) != "" {
+		status = models.OrderStatus(strings.TrimSpace(statusStr))
+		if !status.IsValid() {
+			return nil, ErrInvalidOrderStatus
 		}
+	}
+
+	restaurantID, err := s.orderRepo.GetRestaurantIDByManager(ctx, managerID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNoRestaurantManaged
+	}
+	if err != nil {
 		return nil, err
 	}
 
-	// Parse the status string into the OrderStatus type, if provided
-	var status models.OrderStatus
-	if statusStr != "" {
-		status = models.OrderStatus(statusStr)
-	}
-
-	// Fetch orders for this restaurant
 	orders, err := s.orderRepo.GetOrdersByRestaurant(ctx, restaurantID, status)
 	if err != nil {
 		return nil, err
 	}
 
-	// Map entities to response DTOs with minor-to-major currency conversion
-	var response []models.ManagerOrderResponse
+	response := make([]models.ManagerOrderResponse, 0, len(orders))
 	for _, order := range orders {
-		var itemResponses []models.ManagerOrderItemResponse
+		items := make([]models.ManagerOrderItemResponse, 0, len(order.Items))
 		for _, item := range order.Items {
-			itemResponses = append(itemResponses, models.ManagerOrderItemResponse{
+			items = append(items, models.ManagerOrderItemResponse{
 				MenuItemID: item.MenuItemID,
 				Name:       item.Name,
-				UnitPrice:  float64(item.UnitPrice) / 100.0,
+				UnitPrice:  item.UnitPrice,
 				Quantity:   item.Quantity,
-				LineTotal:  float64(item.LineTotal) / 100.0,
+				LineTotal:  item.LineTotal,
 			})
 		}
-
-		// Consolidate delivery snapshot fields into a clean presentation string
-		fullAddress := fmt.Sprintf("%s, %s, %s", order.DeliveryAddress, order.DeliveryCity, order.DeliveryState)
-
-		// If delivery instructions are empty, provide a default message
-		instructions := order.DeliveryInstructions
-		if instructions == "" {
-			instructions = "No delivery instructions provided"
-		}
-
-		// Append the mapped order to the response slice
 		response = append(response, models.ManagerOrderResponse{
 			ID:                   order.ID,
 			OrderNumber:          order.OrderNumber,
 			Status:               order.Status,
-			Subtotal:             float64(order.Subtotal) / 100.0,
-			DeliveryFee:          float64(order.DeliveryFee) / 100.0,
-			Total:                float64(order.Total) / 100.0,
+			Subtotal:             order.Subtotal,
+			DeliveryFee:          order.DeliveryFee,
+			Total:                order.Total,
 			DeliveryName:         order.DeliveryName,
 			DeliveryPhone:        order.DeliveryPhone,
-			DeliveryAddress:      fullAddress,
-			DeliveryInstructions: instructions,
-			Items:                itemResponses,
-			CreatedAt:            order.CreatedAt.Format("2006-01-02 15:04:05"),
+			DeliveryAddress:      order.DeliveryAddress,
+			DeliveryCity:         order.DeliveryCity,
+			DeliveryState:        order.DeliveryState,
+			DeliveryInstructions: order.DeliveryInstructions,
+			Items:                items,
+			CreatedAt:            order.CreatedAt,
 		})
 	}
-
 	return response, nil
 }

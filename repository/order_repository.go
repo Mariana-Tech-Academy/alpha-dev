@@ -15,6 +15,8 @@ import (
 type OrderRepository interface {
 	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
 	FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error)
+	FindByID(ctx context.Context, id uint) (models.Order, error)
+	UpdateStatus(ctx context.Context, id uint, current, next models.OrderStatus) (bool, error)
 	GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error)
 	GetOrdersByRestaurant(ctx context.Context, restaurantID uint, status models.OrderStatus) ([]models.Order, error)
 }
@@ -31,7 +33,6 @@ var (
 	ErrEmptyCart          = errors.New("your cart is empty")
 	ErrInactiveRestaurant = errors.New("restaurant is not active")
 	ErrUnavailableItem    = errors.New("one or more menu items are unavailable")
-	ErrRestaurantNotFound = errors.New("restaurant not found for manager")
 )
 
 func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error) {
@@ -152,31 +153,37 @@ func (r *PostgresOrderRepo) FindCustomerOrders(ctx context.Context, customerID u
 	return orders, total, nil
 }
 
-func (r *PostgresOrderRepo) GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error) {
-	var restaurantID uint
-	err := r.db.WithContext(ctx).
-		Table("restaurants").
-		Select("id").
-		Where("manager_id = ?", managerID).
-		Scan(&restaurantID).Error
+func (r *PostgresOrderRepo) FindByID(ctx context.Context, id uint) (models.Order, error) {
+	var order models.Order
+	err := r.db.WithContext(ctx).Preload("Restaurant").First(&order, id).Error
+	return order, err
+}
 
+func (r *PostgresOrderRepo) UpdateStatus(ctx context.Context, id uint, current, next models.OrderStatus) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.Order{}).
+		Where("id = ? AND status = ?", id, current).
+		Update("status", next)
+	return result.RowsAffected == 1, result.Error
+}
+
+func (r *PostgresOrderRepo) GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error) {
+	var restaurant models.Restaurant
+	err := r.db.WithContext(ctx).
+		Where("manager_id = ?", managerID).
+		Order("id ASC").
+		First(&restaurant).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, ErrRestaurantNotFound
-		}
 		return 0, err
 	}
-	return restaurantID, nil
+	return restaurant.ID, nil
 }
 
 func (r *PostgresOrderRepo) GetOrdersByRestaurant(ctx context.Context, restaurantID uint, status models.OrderStatus) ([]models.Order, error) {
-	var orders []models.Order
+	orders := make([]models.Order, 0)
 	query := r.db.WithContext(ctx).
 		Where("restaurant_id = ?", restaurantID).
-		Preload("Items").
-		Preload("Customer")
-
-	// Apply status filter if provided; otherwise, default to active kitchen preparation view
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") })
 	if status != "" {
 		query = query.Where("status = ?", status)
 	} else {
@@ -185,7 +192,9 @@ func (r *PostgresOrderRepo) GetOrdersByRestaurant(ctx context.Context, restauran
 			models.OrderStatusCancelled,
 		})
 	}
-
-	err := query.Order("created_at DESC").Find(&orders).Error
-	return orders, err
+	err := query.Order("created_at DESC, id DESC").Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
 }
