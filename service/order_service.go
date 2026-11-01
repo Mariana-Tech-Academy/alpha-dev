@@ -3,18 +3,38 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"alpha-dev/models"
 	"alpha-dev/repository"
+
+	"gorm.io/gorm"
 )
 
 var (
 	ErrEmptyCart                  = errors.New("your cart is empty")
 	ErrCheckoutRestaurantInactive = errors.New("restaurant is not active")
 	ErrCheckoutItemUnavailable    = errors.New("one or more menu items are unavailable")
+	ErrOrderNotFound              = errors.New("order not found")
+	ErrOrderForbidden             = errors.New("you cannot manage orders for this restaurant")
+	ErrInvalidOrderStatus         = errors.New("status must be one of: pending, confirmed, preparing, ready_for_delivery, out_for_delivery, delivered, cancelled")
+	ErrOrderChanged               = errors.New("order changed; refresh and try again")
 )
+
+type OrderTransitionError struct {
+	From    models.OrderStatus
+	To      models.OrderStatus
+	Allowed models.OrderStatus
+}
+
+func (e *OrderTransitionError) Error() string {
+	if e.Allowed == "" {
+		return fmt.Sprintf("order is %s; no further status change is allowed", e.From)
+	}
+	return fmt.Sprintf("cannot change order from %s to %s; the only allowed next status is %s", e.From, e.To, e.Allowed)
+}
 
 const (
 	maxDeliveryNameLength         = 100
@@ -75,9 +95,17 @@ type OrderHistory struct {
 
 const maxOrderPageSize = 20
 
+type UpdatedOrder struct {
+	ID          uint               `json:"id"`
+	OrderNumber string             `json:"order_number"`
+	Status      models.OrderStatus `json:"status"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
 type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
 	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
+	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error)
 }
 
 type orderService struct {
@@ -212,5 +240,52 @@ func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, pag
 		Page:   page,
 		Limit:  limit,
 		Total:  total,
+	}, nil
+}
+
+func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error) {
+	if userID == 0 {
+		return UpdatedOrder{}, ErrInvalidUser
+	}
+	if role != models.RoleManager && role != models.RoleAdmin {
+		return UpdatedOrder{}, ErrOrderForbidden
+	}
+	if !next.IsValid() {
+		return UpdatedOrder{}, ErrInvalidOrderStatus
+	}
+
+	order, err := s.orderRepo.FindByID(ctx, orderID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return UpdatedOrder{}, ErrOrderNotFound
+	}
+	if err != nil {
+		return UpdatedOrder{}, err
+	}
+	if role == models.RoleManager && order.Restaurant.ManagerID != userID {
+		return UpdatedOrder{}, ErrOrderForbidden
+	}
+
+	allowed, ok := order.Status.Next()
+	if !ok || next != allowed {
+		return UpdatedOrder{}, &OrderTransitionError{From: order.Status, To: next, Allowed: allowed}
+	}
+
+	updated, err := s.orderRepo.UpdateStatus(ctx, order.ID, order.Status, next)
+	if err != nil {
+		return UpdatedOrder{}, err
+	}
+	if !updated {
+		return UpdatedOrder{}, ErrOrderChanged
+	}
+
+	fresh, err := s.orderRepo.FindByID(ctx, order.ID)
+	if err != nil {
+		return UpdatedOrder{}, err
+	}
+	return UpdatedOrder{
+		ID:          fresh.ID,
+		OrderNumber: fresh.OrderNumber,
+		Status:      fresh.Status,
+		UpdatedAt:   fresh.UpdatedAt,
 	}, nil
 }

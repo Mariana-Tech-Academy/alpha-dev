@@ -16,6 +16,14 @@ import (
 
 type unusedOrderRepo struct{ t *testing.T }
 
+func (u unusedOrderRepo) FindByID(context.Context, uint) (models.Order, error) {
+	return models.Order{}, nil
+}
+
+func (u unusedOrderRepo) UpdateStatus(context.Context, uint, models.OrderStatus, models.OrderStatus) (bool, error) {
+	return false, nil
+}
+
 func (u unusedOrderRepo) FindCustomerOrders(context.Context, uint, int, int) ([]models.Order, int64, error) {
 	return nil, 0, nil
 }

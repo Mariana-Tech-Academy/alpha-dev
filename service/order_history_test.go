@@ -22,6 +22,14 @@ type orderHistoryRepoStub struct {
 	called     bool
 }
 
+func (f *orderHistoryRepoStub) FindByID(context.Context, uint) (models.Order, error) {
+	return models.Order{}, errors.New("not used")
+}
+
+func (f *orderHistoryRepoStub) UpdateStatus(context.Context, uint, models.OrderStatus, models.OrderStatus) (bool, error) {
+	return false, errors.New("not used")
+}
+
 func (f *orderHistoryRepoStub) PlaceOrder(context.Context, uint, *models.Order) (*models.Order, error) {
 	return nil, errors.New("checkout is not used in these tests")
 }

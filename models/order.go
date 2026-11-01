@@ -14,6 +14,30 @@ const (
 	OrderStatusCancelled        OrderStatus = "cancelled"
 )
 
+// Delivered and cancelled are final. Every other status has one allowed next status.
+var orderFlow = map[OrderStatus]OrderStatus{
+	OrderStatusPending:          OrderStatusConfirmed,
+	OrderStatusConfirmed:        OrderStatusPreparing,
+	OrderStatusPreparing:        OrderStatusReadyForDelivery,
+	OrderStatusReadyForDelivery: OrderStatusOutForDelivery,
+	OrderStatusOutForDelivery:   OrderStatusDelivered,
+}
+
+func (s OrderStatus) IsValid() bool {
+	switch s {
+	case OrderStatusPending, OrderStatusConfirmed, OrderStatusPreparing,
+		OrderStatusReadyForDelivery, OrderStatusOutForDelivery,
+		OrderStatusDelivered, OrderStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (s OrderStatus) Next() (OrderStatus, bool) {
+	next, ok := orderFlow[s]
+	return next, ok
+}
+
 // Delivery fields are a snapshot taken at checkout; they must not reference the user's profile.
 type Order struct {
 	gorm.Model

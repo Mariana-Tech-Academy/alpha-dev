@@ -15,6 +15,8 @@ import (
 type OrderRepository interface {
 	PlaceOrder(ctx context.Context, userID uint, order *models.Order) (*models.Order, error)
 	FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error)
+	FindByID(ctx context.Context, id uint) (models.Order, error)
+	UpdateStatus(ctx context.Context, id uint, current, next models.OrderStatus) (bool, error)
 }
 
 type PostgresOrderRepo struct {
@@ -147,4 +149,18 @@ func (r *PostgresOrderRepo) FindCustomerOrders(ctx context.Context, customerID u
 		return nil, 0, err
 	}
 	return orders, total, nil
+}
+
+func (r *PostgresOrderRepo) FindByID(ctx context.Context, id uint) (models.Order, error) {
+	var order models.Order
+	err := r.db.WithContext(ctx).Preload("Restaurant").First(&order, id).Error
+	return order, err
+}
+
+func (r *PostgresOrderRepo) UpdateStatus(ctx context.Context, id uint, current, next models.OrderStatus) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.Order{}).
+		Where("id = ? AND status = ?", id, current).
+		Update("status", next)
+	return result.RowsAffected == 1, result.Error
 }

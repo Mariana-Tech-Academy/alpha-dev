@@ -15,6 +15,14 @@ type fakeOrderRepo struct {
 	saved *models.Order
 }
 
+func (f *fakeOrderRepo) FindByID(context.Context, uint) (models.Order, error) {
+	return models.Order{}, errors.New("not used")
+}
+
+func (f *fakeOrderRepo) UpdateStatus(context.Context, uint, models.OrderStatus, models.OrderStatus) (bool, error) {
+	return false, errors.New("not used")
+}
+
 func (f *fakeOrderRepo) FindCustomerOrders(context.Context, uint, int, int) ([]models.Order, int64, error) {
 	return nil, 0, errors.New("not used")
 }
