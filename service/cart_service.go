@@ -20,11 +20,13 @@ var (
 	ErrInvalidUser             = errors.New("invalid user ID")
 	ErrCartDifferentRestaurant = errors.New("cart contains items from another restaurant")
 	ErrCartQuantityLimit       = errors.New("quantity cannot exceed 99")
+	ErrCartItemNotFound        = errors.New("cart item not found")
 )
 
 type CartService interface {
 	AddItem(ctx context.Context, userID uint, menuItemID uint, quantity int) (*models.CartItem, error)
 	GetCartView(ctx context.Context, userID uint) (*models.CartViewResponse, error)
+	UpdateQuantity(ctx context.Context, userID uint, itemID uint, quantity int) (*models.CartViewResponse, error)
 }
 
 type cartService struct {
@@ -112,14 +114,23 @@ func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.Car
 		}, nil
 	}
 
-	restaurantOpen := cart.Restaurant != nil && cart.RestaurantID != nil && cart.Restaurant.Status == models.RestaurantStatusActive
+	restaurantOpen := cart.Restaurant != nil &&
+		cart.RestaurantID != nil &&
+		cart.Restaurant.Status == models.RestaurantStatusActive
+
 	items := make([]models.CartItemResponse, 0, len(cart.Items))
 	var subtotal int64
+
 	for _, item := range cart.Items {
 		live := item.MenuItem.Price
 		locked := item.Price
-		available := restaurantOpen && item.MenuItem.ID != 0 && item.MenuItem.Available && item.MenuItem.RestaurantID == *cart.RestaurantID
+		available := restaurantOpen &&
+			item.MenuItem.ID != 0 &&
+			item.MenuItem.Available &&
+			item.MenuItem.RestaurantID == *cart.RestaurantID
+
 		row := models.CartItemResponse{
+			ID:          item.ID,
 			MenuItemID:  item.MenuItemID,
 			Name:        item.MenuItem.Name,
 			Price:       live,
@@ -127,6 +138,7 @@ func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.Car
 			Quantity:    item.Quantity,
 			IsAvailable: available,
 		}
+
 		var notices []string
 		if !available {
 			notices = append(notices, "This item is currently unavailable.")
@@ -136,6 +148,7 @@ func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.Car
 			notices = append(notices, fmt.Sprintf("Price changed from %d to %d.", locked, live))
 		}
 		row.Notice = strings.Join(notices, " ")
+
 		if available {
 			row.LineTotal = locked * int64(item.Quantity)
 			subtotal += row.LineTotal
@@ -149,4 +162,37 @@ func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.Car
 		Items:        items,
 		Subtotal:     subtotal,
 	}, nil
+}
+
+// Accept quantities from 1 to 99. Invalid quantities leave the item unchanged.
+func (s *cartService) UpdateQuantity(
+	ctx context.Context,
+	userID uint,
+	itemID uint,
+	quantity int,
+) (*models.CartViewResponse, error) {
+	if userID == 0 {
+		return nil, ErrInvalidUser
+	}
+	if itemID == 0 {
+		return nil, ErrCartItemNotFound
+	}
+	if quantity < 1 {
+		return nil, ErrInvalidQuantity
+	}
+	if quantity > repository.MaxCartLineQuantity {
+		return nil, ErrCartQuantityLimit
+	}
+
+	// Update the customer's item.
+	err := s.cartRepo.UpdateQuantity(ctx, userID, itemID, quantity)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCartItemNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Reuse the existing calculation for the new totals.
+	return s.GetCartView(ctx, userID)
 }
