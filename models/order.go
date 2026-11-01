@@ -37,4 +37,3 @@ type Order struct {
 
 	Items []OrderItem `json:"items"`
 }
-
