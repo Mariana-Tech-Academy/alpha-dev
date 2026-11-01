@@ -1,32 +1,34 @@
 package service
 
 import (
-	"alpha-dev/repository"
-	"gorm.io/gorm"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"alpha-dev/models"
+	"alpha-dev/repository"
+
+	"gorm.io/gorm"
 )
 
-//grouped declaration of error values
 var (
-	ErrOrderNotFound      = errors.New("order not found")
-	ErrOrderForbidden     = errors.New("you cannot manage orders for this restaurant")
-	ErrInvalidOrderStatus = errors.New("status must be one of: pending, confirmed, preparing, ready_for_delivery, out_for_delivery, delivered, cancelled")
-	ErrOrderChanged       = errors.New("order changed; refresh and try again")
+	ErrEmptyCart                  = errors.New("your cart is empty")
+	ErrCheckoutRestaurantInactive = errors.New("restaurant is not active")
+	ErrCheckoutItemUnavailable    = errors.New("one or more menu items are unavailable")
+	ErrOrderNotFound              = errors.New("order not found")
+	ErrOrderForbidden             = errors.New("you cannot manage orders for this restaurant")
+	ErrInvalidOrderStatus         = errors.New("status must be one of: pending, confirmed, preparing, ready_for_delivery, out_for_delivery, delivered, cancelled")
+	ErrOrderChanged               = errors.New("order changed; refresh and try again")
 )
 
 type OrderTransitionError struct {
 	From    models.OrderStatus
 	To      models.OrderStatus
-	Allowed models.OrderStatus // empty when From is a final status
+	Allowed models.OrderStatus
 }
 
-//In Go, an error is anything that has a method called Error() that returns a string, Go's internal interface
-//the receiver: this method belongs to OrderTransitionError, and inside it we call the object e
-//e.Allowed is empty when From is a final status
 func (e *OrderTransitionError) Error() string {
 	if e.Allowed == "" {
 		return fmt.Sprintf("order is %s; no further status change is allowed", e.From)
@@ -34,8 +36,76 @@ func (e *OrderTransitionError) Error() string {
 	return fmt.Sprintf("cannot change order from %s to %s; the only allowed next status is %s", e.From, e.To, e.Allowed)
 }
 
+const (
+	maxDeliveryNameLength         = 100
+	maxDeliveryPhoneLength        = 30
+	maxDeliveryAddressLength      = 200
+	maxDeliveryInstructionsLength = 200
+)
+
+type OrderValidationError struct {
+	Fields map[string]string
+}
+
+func (err *OrderValidationError) Error() string {
+	return "invalid order"
+}
+
+type PlaceOrderRequest struct {
+	DeliveryName         string `json:"delivery_name"`
+	DeliveryPhone        string `json:"delivery_phone"`
+	DeliveryAddress      string `json:"delivery_address"`
+	DeliveryCity         string `json:"delivery_city"`
+	DeliveryState        string `json:"delivery_state"`
+	DeliveryInstructions string `json:"delivery_instructions"`
+}
+
+type PlacedOrderItem struct {
+	Name      string `json:"name"`
+	UnitPrice int64  `json:"unit_price"`
+	Quantity  int    `json:"quantity"`
+	LineTotal int64  `json:"line_total"`
+}
+
+type PlacedOrder struct {
+	OrderNumber string             `json:"order_number"`
+	Status      models.OrderStatus `json:"status"`
+	Subtotal    int64              `json:"subtotal"`
+	DeliveryFee int64              `json:"delivery_fee"`
+	Total       int64              `json:"total"`
+	Items       []PlacedOrderItem  `json:"items"`
+}
+
+type OrderHistoryItem struct {
+	ID             uint               `json:"id"`
+	OrderNumber    string             `json:"order_number"`
+	RestaurantID   uint               `json:"restaurant_id"`
+	RestaurantName string             `json:"restaurant_name"`
+	Total          int64              `json:"total"`
+	Status         models.OrderStatus `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+}
+
+type OrderHistory struct {
+	Orders []OrderHistoryItem `json:"orders"`
+	Page   int                `json:"page"`
+	Limit  int                `json:"limit"`
+	Total  int64              `json:"total"`
+}
+
+const maxOrderPageSize = 20
+
+type UpdatedOrder struct {
+	ID          uint               `json:"id"`
+	OrderNumber string             `json:"order_number"`
+	Status      models.OrderStatus `json:"status"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
 type OrderService interface {
-	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (*models.Order, error)
+	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
+	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
+	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error)
 }
 
 type orderService struct {
@@ -46,59 +116,176 @@ func NewOrderService(repo repository.OrderRepository) OrderService {
 	return &orderService{orderRepo: repo}
 }
 
-func (s *orderService) UpdateOrderStatus(
-	ctx context.Context,
-	userID uint,
-	role models.Role,
-	orderID uint,
-	next models.OrderStatus,
-) (*models.Order, error) {
-	//userID == 0 || (role is neither manager nor admin) returns forbidden.
-	if userID == 0 || (role != models.RoleManager && role != models.RoleAdmin) {
-		return nil, ErrOrderForbidden
+func (s *orderService) PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error) {
+	if userID == 0 {
+		return PlacedOrder{}, ErrInvalidUser
+	}
+
+	name := strings.TrimSpace(req.DeliveryName)
+	phone := strings.TrimSpace(req.DeliveryPhone)
+	address := strings.TrimSpace(req.DeliveryAddress)
+	city := strings.TrimSpace(req.DeliveryCity)
+	state := strings.TrimSpace(req.DeliveryState)
+	instructions := strings.TrimSpace(req.DeliveryInstructions)
+
+	fields := map[string]string{}
+	if name == "" {
+		fields["delivery_name"] = "name is required"
+	} else if len([]rune(name)) > maxDeliveryNameLength {
+		fields["delivery_name"] = "name must not exceed 100 characters"
+	}
+	if phone == "" {
+		fields["delivery_phone"] = "Phone number is required"
+	} else if len([]rune(phone)) > maxDeliveryPhoneLength {
+		fields["delivery_phone"] = "Phone number must not exceed 30 characters"
+	} else if !validPhone(phone) {
+		fields["delivery_phone"] = "Enter a valid phone number"
+	}
+	if address == "" {
+		fields["delivery_address"] = "address is required"
+	} else if len([]rune(address)) > maxDeliveryAddressLength {
+		fields["delivery_address"] = "address must not exceed 200 characters"
+	}
+	if city == "" {
+		fields["delivery_city"] = "city is required"
+	} else if len([]rune(city)) > maxDeliveryNameLength {
+		fields["delivery_city"] = "city must not exceed 100 characters"
+	}
+	if state == "" {
+		fields["delivery_state"] = "state is required"
+	} else if len([]rune(state)) > maxDeliveryNameLength {
+		fields["delivery_state"] = "state must not exceed 100 characters"
+	}
+	if len([]rune(instructions)) > maxDeliveryInstructionsLength {
+		fields["delivery_instructions"] = "instructions must not exceed 200 characters"
+	}
+	if len(fields) > 0 {
+		return PlacedOrder{}, &OrderValidationError{Fields: fields}
+	}
+
+	order := &models.Order{
+		DeliveryName:         name,
+		DeliveryPhone:        phone,
+		DeliveryAddress:      address,
+		DeliveryCity:         city,
+		DeliveryState:        state,
+		DeliveryInstructions: instructions,
+	}
+	placed, err := s.orderRepo.PlaceOrder(ctx, userID, order)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrEmptyCart):
+			return PlacedOrder{}, ErrEmptyCart
+		case errors.Is(err, repository.ErrInactiveRestaurant):
+			return PlacedOrder{}, ErrCheckoutRestaurantInactive
+		case errors.Is(err, repository.ErrUnavailableItem):
+			return PlacedOrder{}, ErrCheckoutItemUnavailable
+		default:
+			return PlacedOrder{}, err
+		}
+	}
+
+	items := make([]PlacedOrderItem, 0, len(placed.Items))
+	for _, item := range placed.Items {
+		items = append(items, PlacedOrderItem{
+			Name:      item.Name,
+			UnitPrice: item.UnitPrice,
+			Quantity:  item.Quantity,
+			LineTotal: item.LineTotal,
+		})
+	}
+	return PlacedOrder{
+		OrderNumber: placed.OrderNumber,
+		Status:      placed.Status,
+		Subtotal:    placed.Subtotal,
+		DeliveryFee: placed.DeliveryFee,
+		Total:       placed.Total,
+		Items:       items,
+	}, nil
+}
+
+func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error) {
+	if customerID == 0 {
+		return OrderHistory{}, ErrInvalidUser
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > maxOrderPageSize {
+		limit = maxOrderPageSize
+	}
+
+	orders, total, err := s.orderRepo.FindCustomerOrders(ctx, customerID, limit, (page-1)*limit)
+	if err != nil {
+		return OrderHistory{}, err
+	}
+
+	items := make([]OrderHistoryItem, 0, len(orders))
+	for _, order := range orders {
+		items = append(items, OrderHistoryItem{
+			ID:             order.ID,
+			OrderNumber:    order.OrderNumber,
+			RestaurantID:   order.RestaurantID,
+			RestaurantName: order.Restaurant.Name,
+			Total:          order.Total,
+			Status:         order.Status,
+			CreatedAt:      order.CreatedAt,
+		})
+	}
+	return OrderHistory{
+		Orders: items,
+		Page:   page,
+		Limit:  limit,
+		Total:  total,
+	}, nil
+}
+
+func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error) {
+	if userID == 0 {
+		return UpdatedOrder{}, ErrInvalidUser
+	}
+	if role != models.RoleManager && role != models.RoleAdmin {
+		return UpdatedOrder{}, ErrOrderForbidden
 	}
 	if !next.IsValid() {
-		//!next.IsValid() rejects nonsense before touching the database, which is cheap and fast.
-		return nil, ErrInvalidOrderStatus
+		return UpdatedOrder{}, ErrInvalidOrderStatus
 	}
 
 	order, err := s.orderRepo.FindByID(ctx, orderID)
-	//errors.Is(err, gorm.ErrRecordNotFound) turns a database-level error into our ErrOrderNotFound
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrOrderNotFound
+		return UpdatedOrder{}, ErrOrderNotFound
 	}
-	//Any other error is passed up unchanged.
 	if err != nil {
-		return nil, err
+		return UpdatedOrder{}, err
 	}
-
 	if role == models.RoleManager && order.Restaurant.ManagerID != userID {
-		//manager cannot update another restaurant’s order (403)” criterion
-		return nil, ErrOrderForbidden
+		return UpdatedOrder{}, ErrOrderForbidden
 	}
 
 	allowed, ok := order.Status.Next()
 	if !ok || next != allowed {
-		//!ok (the order is final) or next != allowed (the manager tried to skip or go backwards). Both return an OrderTransitionError.
-		return nil, &OrderTransitionError{From: order.Status, To: next, Allowed: allowed}
+		return UpdatedOrder{}, &OrderTransitionError{From: order.Status, To: next, Allowed: allowed}
 	}
 
 	updated, err := s.orderRepo.UpdateStatus(ctx, order.ID, order.Status, next)
 	if err != nil {
-		return nil, err
+		return UpdatedOrder{}, err
 	}
 	if !updated {
-		return nil, ErrOrderChanged
+		return UpdatedOrder{}, ErrOrderChanged
 	}
 
 	fresh, err := s.orderRepo.FindByID(ctx, order.ID)
 	if err != nil {
-		return nil, err
+		return UpdatedOrder{}, err
 	}
-	return &fresh, nil
+	return UpdatedOrder{
+		ID:          fresh.ID,
+		OrderNumber: fresh.OrderNumber,
+		Status:      fresh.Status,
+		UpdatedAt:   fresh.UpdatedAt,
+	}, nil
 }
-
-
-
-
-

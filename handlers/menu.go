@@ -197,6 +197,47 @@ func (h *MenuHandler) SearchMenuItems(w http.ResponseWriter, r *http.Request) {
 	utils.Success(w, http.StatusOK, "menu items retrieved", items)
 }
 
+func (h *MenuHandler) GetRestaurantMenu(w http.ResponseWriter, r *http.Request) {
+	restaurantID, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
+	if err != nil || restaurantID == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid restaurant ID")
+		return
+	}
+
+	var categoryID uint
+	values, supplied := r.URL.Query()["category_id"]
+	if supplied {
+		if len(values) != 1 {
+			utils.Error(w, http.StatusBadRequest, "provide one category ID")
+			return
+		}
+		id, err := strconv.ParseUint(values[0], 10, 64)
+		if err != nil || id == 0 {
+			utils.Error(w, http.StatusBadRequest, "invalid category ID")
+			return
+		}
+		categoryID = uint(id)
+	}
+
+	menu, err := h.MenuService.GetRestaurantMenu(r.Context(), uint(restaurantID), categoryID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrRestaurantIDRequired):
+			utils.Error(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, service.ErrRestaurantNotFound):
+			utils.Error(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, service.ErrMenuUnavailable):
+			utils.Error(w, http.StatusForbidden, err.Error())
+		default:
+			log.Printf("get restaurant menu: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to load menu")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurant menu", menu)
+}
+
 func parseUintParam(value string) (*uint, error) {
 	if value == "" {
 		return nil, nil

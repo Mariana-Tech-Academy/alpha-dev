@@ -6,10 +6,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"alpha-dev/auth"
 	"alpha-dev/service"
 	"alpha-dev/utils"
+
+	"github.com/gorilla/mux"
 )
 
 type CartHandler struct {
@@ -23,6 +26,10 @@ func NewCartHandler(s service.CartService) *CartHandler {
 type AddCartItemRequest struct {
 	MenuItemID uint `json:"menu_item_id"`
 	Quantity   int  `json:"quantity"`
+}
+
+type UpdateCartQuantityRequest struct {
+	Quantity int `json:"quantity"`
 }
 
 func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
@@ -93,4 +100,76 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 		"quantity":     item.Quantity,
 		"price":        item.Price,
 	})
+}
+
+func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	cartView, err := h.CartService.GetCartView(r.Context(), claims.UserID)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidUser) {
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+			return
+		}
+		log.Printf("get cart: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "unable to retrieve cart")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "cart retrieved successfully", cartView)
+}
+
+func (h *CartHandler) UpdateQuantity(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	itemID, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
+	if err != nil || itemID == 0 {
+		utils.Error(w, http.StatusBadRequest, "invalid cart item ID")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+	var req UpdateCartQuantityRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&req); err != nil {
+		utils.Error(w, http.StatusBadRequest, "invalid cart JSON")
+		return
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		utils.Error(w, http.StatusBadRequest, "invalid cart JSON")
+		return
+	}
+
+	cart, err := h.CartService.UpdateQuantity(
+		r.Context(), claims.UserID, uint(itemID), req.Quantity,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUser):
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		case errors.Is(err, service.ErrInvalidQuantity),
+			errors.Is(err, service.ErrCartQuantityLimit):
+			utils.ValidationError(w, "check the cart details", map[string]string{
+				"quantity": err.Error(),
+			})
+		case errors.Is(err, service.ErrCartItemNotFound):
+			utils.Error(w, http.StatusNotFound, "cart item not found")
+		default:
+			log.Printf("update cart quantity: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to update quantity")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "cart quantity updated", cart)
 }

@@ -278,3 +278,27 @@ func formField(r *http.Request, key string) *string {
 	value := values[0]
 	return &value
 }
+
+func (h *RestaurantHandler) SearchRestaurants(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if raw := r.URL.Query().Get("page"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			page = parsed
+		}
+	}
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+
+	restaurants, err := h.RestaurantService.SearchRestaurants(r.Context(), r.URL.Query().Get("q"), page, limit)
+	if err != nil {
+		log.Printf("search restaurants: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "failed to fetch restaurants")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "restaurants retrieved", restaurants)
+}

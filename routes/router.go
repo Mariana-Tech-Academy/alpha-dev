@@ -30,7 +30,7 @@ func Router(db *gorm.DB, tokens *auth.JWTManager) *mux.Router {
 	MenuRoutes(api, db, tokens)
 	CategoryRoutes(api, db, tokens)
 	CartRoutes(api, db, tokens)
-	CheckoutRoutes(api, db, tokens)   
+	CheckoutRoutes(api, db, tokens)
 	OrderRoutes(api, db, tokens)
 	AdminRoutes(api, db, tokens)
 

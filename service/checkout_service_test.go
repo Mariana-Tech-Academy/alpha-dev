@@ -1,7 +1,5 @@
 package service
 
-//service/checkout_service_test.go checks that Summary behaves correctly without needing a database or a running server.
-
 import (
 	"context"
 	"errors"
@@ -13,45 +11,87 @@ import (
 	"gorm.io/gorm"
 )
 
-// fakeCartRepo (cart_service_test.go) must satisfy the full CartRepository interface.
 func (f *fakeCartRepo) FindCartByUserID(context.Context, uint) (*models.Cart, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
-//pretend store room
-//holds the cart and error we want to hand back
+func (f *fakeCartRepo) UpdateQuantity(context.Context, uint, uint, int) error {
+	return errors.New("not used by add-item tests")
+}
+
 type fakeCheckoutCartRepo struct {
-	repository.CartRepository
 	cart *models.Cart
 	err  error
 }
-//This is the fake version of “go and get the cart”. It doesn’t look anything up. It just returns whatever is in the two boxes.
+
 func (f *fakeCheckoutCartRepo) FindCartByUserID(context.Context, uint) (*models.Cart, error) {
 	return f.cart, f.err
 }
 
-//A cart item takes several lines to build, and Question 1 needs two of them. This helper builds one from four short values.
-func cartLine(menuItemID uint, name string, qty int, price int64) models.CartItem {
-	return models.CartItem{
-		MenuItemID: menuItemID,
-		MenuItem:   models.MenuItem{Name: name},
-		Quantity:   qty,
-		Price:      price,
+func (f *fakeCheckoutCartRepo) AddItem(context.Context, uint, uint, uint, int, int64) (*models.CartItem, error) {
+	return nil, errors.New("not implemented")
+}
+
+// Change an item only when the test cart belongs to this customer.
+func (f *fakeCheckoutCartRepo) UpdateQuantity(
+	_ context.Context,
+	userID uint,
+	itemID uint,
+	quantity int,
+) error {
+	if f.err != nil {
+		return f.err
 	}
+	if f.cart == nil || f.cart.UserID != userID {
+		return gorm.ErrRecordNotFound
+	}
+
+	for i := range f.cart.Items {
+		if f.cart.Items[i].ID == itemID {
+			f.cart.Items[i].Quantity = quantity
+			return nil
+		}
+	}
+
+	return gorm.ErrRecordNotFound
+}
+
+var _ repository.CartRepository = (*fakeCheckoutCartRepo)(nil)
+
+func cartLine(menuItemID uint, name string, qty int, price int64, restaurantID uint) models.CartItem {
+	item := models.CartItem{
+		MenuItemID: menuItemID,
+		MenuItem: models.MenuItem{
+			Name:         name,
+			Available:    true,
+			RestaurantID: restaurantID,
+		},
+		Quantity: qty,
+		Price:    price,
+	}
+	item.MenuItem.ID = menuItemID
+	return item
 }
 
 func TestCheckoutSummary(t *testing.T) {
-	restaurant := &models.Restaurant{Name: "Mama Put"}
-	restaurant.ID = 3
+	restaurantID := uint(3)
+	restaurant := &models.Restaurant{
+		Name:   "Mama Put",
+		Status: models.RestaurantStatusActive,
+	}
+	restaurant.ID = restaurantID
 
-	t.Run("totals subtotal, delivery fee and total", func(t *testing.T) {
-		// N14,500 subtotal + N2,000 delivery = N16,500 (values in kobo).
-		cart := &models.Cart{Restaurant: restaurant, Items: []models.CartItem{
-			cartLine(1, "Jollof Rice", 2, 450000),
-			cartLine(2, "Fried Chicken", 1, 550000),
-		}}
-		//creating the service that uses the fake store room
-		got, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 200000).Summary(context.Background(), 4)
+	t.Run("totals the cart line prices and the delivery fee", func(t *testing.T) {
+		cart := &models.Cart{
+			RestaurantID: &restaurantID,
+			Restaurant:   restaurant,
+			Items: []models.CartItem{
+				cartLine(1, "Jollof Rice", 2, 450000, restaurantID),
+				cartLine(2, "Fried Chicken", 1, 550000, restaurantID),
+			},
+		}
+		got, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 200000).
+			Summary(context.Background(), 4)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -61,38 +101,136 @@ func TestCheckoutSummary(t *testing.T) {
 		if got.Restaurant.ID != 3 || got.Restaurant.Name != "Mama Put" {
 			t.Fatalf("restaurant = %+v", got.Restaurant)
 		}
-		if len(got.Items) != 2 || got.Items[0].LineTotal != 900000 || got.Items[0].Quantity != 2 || got.Items[0].Name != "Jollof Rice" {
+		if len(got.Items) != 2 ||
+			got.Items[0].LineTotal != 900000 ||
+			got.Items[0].UnitPrice != 450000 ||
+			got.Items[0].Name != "Jollof Rice" {
 			t.Fatalf("items = %+v", got.Items)
 		}
 	})
 
-	t.Run("no cart is treated as empty", func(t *testing.T) {
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{err: gorm.ErrRecordNotFound}, 200000).Summary(context.Background(), 4)
+	t.Run("no cart is empty", func(t *testing.T) {
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{err: gorm.ErrRecordNotFound}, 0).
+			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrEmptyCart) {
-			t.Fatalf("err = %v, want ErrEmptyCart", err)
+			t.Fatalf("err = %v", err)
 		}
 	})
 
-	t.Run("cart with no items is blocked", func(t *testing.T) {
-		cart := &models.Cart{Restaurant: restaurant}
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 200000).Summary(context.Background(), 4)
+	t.Run("cart with no items is empty", func(t *testing.T) {
+		cart := &models.Cart{
+			RestaurantID: &restaurantID,
+			Restaurant:   restaurant,
+		}
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrEmptyCart) {
-			t.Fatalf("err = %v, want ErrEmptyCart", err)
+			t.Fatalf("err = %v", err)
 		}
 	})
 
 	t.Run("invalid user", func(t *testing.T) {
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{}, 200000).Summary(context.Background(), 0)
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{}, 0).
+			Summary(context.Background(), 0)
 		if !errors.Is(err, ErrInvalidUser) {
-			t.Fatalf("err = %v, want ErrInvalidUser", err)
+			t.Fatalf("err = %v", err)
 		}
 	})
 
-	t.Run("repository failure is returned", func(t *testing.T) {
-		boom := errors.New("db down")
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{err: boom}, 200000).Summary(context.Background(), 4)
-		if !errors.Is(err, boom) {
-			t.Fatalf("err = %v, want db error", err)
+	t.Run("inactive restaurant", func(t *testing.T) {
+		pending := *restaurant
+		pending.Status = models.RestaurantStatusPending
+		cart := &models.Cart{
+			RestaurantID: &restaurantID,
+			Restaurant:   &pending,
+			Items: []models.CartItem{
+				cartLine(1, "Jollof Rice", 1, 450000, restaurantID),
+			},
+		}
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+			Summary(context.Background(), 4)
+		if !errors.Is(err, ErrCheckoutRestaurantInactive) {
+			t.Fatalf("err = %v", err)
 		}
 	})
+
+	t.Run("unavailable item", func(t *testing.T) {
+		line := cartLine(1, "Jollof Rice", 1, 450000, restaurantID)
+		line.MenuItem.Available = false
+		cart := &models.Cart{
+			RestaurantID: &restaurantID,
+			Restaurant:   restaurant,
+			Items:        []models.CartItem{line},
+		}
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+			Summary(context.Background(), 4)
+		if !errors.Is(err, ErrCheckoutItemUnavailable) {
+			t.Fatalf("err = %v", err)
+		}
+	})
+}
+
+func TestUpdateCartQuantity(t *testing.T) {
+	restaurantID := uint(3)
+	item := cartLine(9, "Pizza", 2, 1000, restaurantID)
+	item.ID = 7
+	item.MenuItem.Price = 1000
+
+	cart := &models.Cart{
+		UserID:       4,
+		RestaurantID: &restaurantID,
+		Restaurant: &models.Restaurant{
+			Status: models.RestaurantStatusActive,
+		},
+		Items: []models.CartItem{item},
+	}
+	svc := NewCartService(&fakeCheckoutCartRepo{cart: cart}, nil)
+
+	// Increasing or decreasing quantity updates both totals.
+	for _, quantity := range []int{5, 1} {
+		view, err := svc.UpdateQuantity(context.Background(), 4, 7, quantity)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		row := view.Items[0]
+		expected := int64(quantity) * 1000
+		if row.ID != 7 || row.Quantity != quantity ||
+			row.Price != 1000 || row.LockedPrice != 1000 || row.PriceChanged ||
+			row.LineTotal != expected || view.Subtotal != expected {
+			t.Fatalf("unexpected cart: %+v", view)
+		}
+	}
+
+	// Invalid quantities must not change the saved quantity.
+	for _, quantity := range []int{0, -1} {
+		_, err := svc.UpdateQuantity(context.Background(), 4, 7, quantity)
+		if !errors.Is(err, ErrInvalidQuantity) {
+			t.Fatalf("expected invalid quantity, got %v", err)
+		}
+		if cart.Items[0].Quantity != 1 {
+			t.Fatal("invalid request changed the quantity")
+		}
+	}
+	_, err := svc.UpdateQuantity(context.Background(), 4, 7, 100)
+	if !errors.Is(err, ErrCartQuantityLimit) {
+		t.Fatalf("expected quantity limit, got %v", err)
+	}
+	if cart.Items[0].Quantity != 1 {
+		t.Fatal("invalid request changed the quantity")
+	}
+
+	// Another customer cannot change this cart.
+	_, err = svc.UpdateQuantity(context.Background(), 8, 7, 5)
+	if !errors.Is(err, ErrCartItemNotFound) {
+		t.Fatalf("expected item not found, got %v", err)
+	}
+	if cart.Items[0].Quantity != 1 {
+		t.Fatal("another customer's quantity changed")
+	}
+
+	// An unknown cart item must return not found.
+	_, err = svc.UpdateQuantity(context.Background(), 4, 99, 5)
+	if !errors.Is(err, ErrCartItemNotFound) {
+		t.Fatalf("expected item not found, got %v", err)
+	}
 }

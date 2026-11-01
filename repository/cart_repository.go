@@ -1,9 +1,5 @@
 package repository
 
-//Request → handler → service → repository → database
-
-//repository/cart_repository.go is the only file that talks to the database for cart data.
-
 import (
 	"context"
 	"errors"
@@ -25,10 +21,11 @@ type CartRepository interface {
 	) (*models.CartItem, error)
 
 	FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error)
+	UpdateQuantity(ctx context.Context, userID uint, itemID uint, quantity int) error
 }
 
 const MaxCartLineQuantity = 99
-// holds connection to database
+
 type PostgresCartRepo struct {
 	db *gorm.DB
 }
@@ -43,18 +40,13 @@ var (
 )
 
 func (r *PostgresCartRepo) FindCartByUserID(ctx context.Context, userID uint) (*models.Cart, error) {
-	//ties the query to the request context, if the request times out or is cancelled the query is cancelled
 	var cart models.Cart
 	err := r.db.WithContext(ctx).
-		Preload("Restaurant"). //loads restaurant
-		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).// cart's Items in ascending order
-		Preload("Items.MenuItem").//menu item inside each cart 
-		Where("user_id = ?", userID).//finds the cart belonging to this customer. The ? is a placeholder. GORM fills in the value safely with the value you pass next to it, which protects against SQL injection, so never build the string by hand.
-		First(&cart).Error //fetches one row into the cart variable. If there is no row, it returns gorm.ErrRecordNotFound
-
-		/*
-		SQL injection is when an attacker types SQL code into an input box (like a login form) and your app runs it as part of its database query, letting them read or change data they shouldn’t
-		*/
+		Preload("Restaurant").
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("Items.MenuItem").
+		Where("user_id = ?", userID).
+		First(&cart).Error
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +61,9 @@ func (r *PostgresCartRepo) AddItem(
 	quantity int,
 	price int64,
 ) (*models.CartItem, error) {
-
 	var result models.CartItem
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-
 		// Create the customer's cart if it does not exist.
 		cart := models.Cart{
 			UserID: userID,
@@ -162,4 +152,33 @@ func (r *PostgresCartRepo) AddItem(
 	}
 
 	return &result, nil
+}
+
+// Update an item only within the logged-in customer's cart.
+func (r *PostgresCartRepo) UpdateQuantity(
+	ctx context.Context,
+	userID uint,
+	itemID uint,
+	quantity int,
+) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var cart models.Cart
+
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ?", userID).
+			First(&cart).Error
+		if err != nil {
+			return err
+		}
+
+		var item models.CartItem
+		err = tx.Where("id = ? AND cart_id = ?", itemID, cart.ID).
+			First(&item).Error
+		if err != nil {
+			return err
+		}
+
+		// Keep the saved price and change only the quantity.
+		return tx.Model(&item).Update("quantity", quantity).Error
+	})
 }

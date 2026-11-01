@@ -73,6 +73,10 @@ func (f *fakeMenuRepo) DeleteMenuItem(_ context.Context, id uint) error {
 	return nil
 }
 
+func (f *fakeMenuRepo) FindMenuByRestaurant(context.Context, uint, uint) ([]models.MenuItem, error) {
+	return []models.MenuItem{}, nil
+}
+
 func (f *fakeMenuRepo) SearchMenuItems(_ context.Context, q repository.MenuSearchQuery) ([]models.MenuSearchResult, error) {
 	f.searchQuery = q
 	if f.searchErr != nil {

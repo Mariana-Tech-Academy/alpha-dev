@@ -17,6 +17,7 @@ type MenuRepository interface {
 	UpdateMenuItem(ctx context.Context, id uint, fields map[string]any) error
 	DeleteMenuItem(ctx context.Context, id uint) error
 	SearchMenuItems(ctx context.Context, q MenuSearchQuery) ([]models.MenuSearchResult, error)
+	FindMenuByRestaurant(ctx context.Context, restaurantID uint, categoryID uint) ([]models.MenuItem, error)
 }
 
 // MenuSearchQuery is a normalized menu search. Query is already escaped for ILIKE.
@@ -106,5 +107,17 @@ func (repo *PostgresMenuRepo) SearchMenuItems(ctx context.Context, q MenuSearchQ
 		Limit(q.Limit).
 		Offset(q.Offset).
 		Scan(&items).Error
+	return items, err
+}
+
+func (repo *PostgresMenuRepo) FindMenuByRestaurant(ctx context.Context, restaurantID uint, categoryID uint) ([]models.MenuItem, error) {
+	items := make([]models.MenuItem, 0)
+	query := repo.db.WithContext(ctx).
+		Preload("Category").
+		Where("restaurant_id = ?", restaurantID)
+	if categoryID != 0 {
+		query = query.Where("category_id = ?", categoryID)
+	}
+	err := query.Order("id ASC").Find(&items).Error
 	return items, err
 }

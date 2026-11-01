@@ -19,6 +19,7 @@ func MenuRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	menuHandler := handlers.NewMenuHandler(menuService)
 
 	// public routes: GET /restaurants/{id}/menu, GET /menu, GET /menu/{id}
+	router.HandleFunc("/restaurants/{id}/menu", menuHandler.GetRestaurantMenu).Methods(http.MethodGet)
 	router.HandleFunc("/menu", menuHandler.SearchMenuItems).Methods(http.MethodGet)
 	router.HandleFunc("/menu/{id}", menuHandler.GetMenuItemDetails).Methods(http.MethodGet)
 

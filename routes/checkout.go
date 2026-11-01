@@ -16,12 +16,10 @@ import (
 
 func CheckoutRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	cartRepo := repository.NewCartRepository(db)
-	checkoutService := service.NewCheckoutService(cartRepo, service.DefaultDeliveryFee)
+	checkoutService := service.NewCheckoutService(cartRepo, 0)
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutService)
 
-	// customer routes: GET /checkout/summary
 	customer := protected(router, tokens)
 	customer.Use(middleware.RequireRole(models.RoleCustomer))
-
 	customer.HandleFunc("/checkout/summary", checkoutHandler.Summary).Methods(http.MethodGet)
 }
