@@ -29,6 +29,14 @@ func (f *statusOrderRepo) FindCustomerOrders(context.Context, uint, int, int) ([
 	return nil, 0, errors.New("not used")
 }
 
+func (f *statusOrderRepo) GetRestaurantIDByManager(context.Context, uint) (uint, error) {
+	return 0, errors.New("not used")
+}
+
+func (f *statusOrderRepo) GetOrdersByRestaurant(context.Context, uint, models.OrderStatus) ([]models.Order, error) {
+	return nil, errors.New("not used")
+}
+
 func (f *statusOrderRepo) FindByID(context.Context, uint) (models.Order, error) {
 	if f.findErr != nil {
 		return models.Order{}, f.findErr

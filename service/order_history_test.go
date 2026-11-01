@@ -42,6 +42,14 @@ func (f *orderHistoryRepoStub) FindCustomerOrders(_ context.Context, customerID 
 	return f.orders, f.total, f.err
 }
 
+func (f *orderHistoryRepoStub) GetRestaurantIDByManager(_ context.Context, _ uint) (uint, error) {
+	return 0, errors.New("not used in order history tests")
+}
+
+func (f *orderHistoryRepoStub) GetOrdersByRestaurant(_ context.Context, _ uint, _ models.OrderStatus) ([]models.Order, error) {
+	return nil, errors.New("not used in order history tests")
+}
+
 var _ repository.OrderRepository = (*orderHistoryRepoStub)(nil)
 
 func TestOrderHistoryReturnsRequestedPage(t *testing.T) {

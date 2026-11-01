@@ -17,6 +17,8 @@ type OrderRepository interface {
 	FindCustomerOrders(ctx context.Context, customerID uint, limit, offset int) ([]models.Order, int64, error)
 	FindByID(ctx context.Context, id uint) (models.Order, error)
 	UpdateStatus(ctx context.Context, id uint, current, next models.OrderStatus) (bool, error)
+	GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error)
+	GetOrdersByRestaurant(ctx context.Context, restaurantID uint, status models.OrderStatus) ([]models.Order, error)
 }
 
 type PostgresOrderRepo struct {
@@ -163,4 +165,36 @@ func (r *PostgresOrderRepo) UpdateStatus(ctx context.Context, id uint, current, 
 		Where("id = ? AND status = ?", id, current).
 		Update("status", next)
 	return result.RowsAffected == 1, result.Error
+}
+
+func (r *PostgresOrderRepo) GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error) {
+	var restaurant models.Restaurant
+	err := r.db.WithContext(ctx).
+		Where("manager_id = ?", managerID).
+		Order("id ASC").
+		First(&restaurant).Error
+	if err != nil {
+		return 0, err
+	}
+	return restaurant.ID, nil
+}
+
+func (r *PostgresOrderRepo) GetOrdersByRestaurant(ctx context.Context, restaurantID uint, status models.OrderStatus) ([]models.Order, error) {
+	orders := make([]models.Order, 0)
+	query := r.db.WithContext(ctx).
+		Where("restaurant_id = ?", restaurantID).
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") })
+	if status != "" {
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status NOT IN ?", []models.OrderStatus{
+			models.OrderStatusDelivered,
+			models.OrderStatusCancelled,
+		})
+	}
+	err := query.Order("created_at DESC, id DESC").Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
 }

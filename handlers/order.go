@@ -158,3 +158,31 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 
 	utils.Success(w, http.StatusOK, "order status updated", order)
 }
+
+func (h *OrderHandler) GetManagerOrders(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	orders, err := h.OrderService.GetManagerOrders(r.Context(), claims.UserID, r.URL.Query().Get("status"))
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUser):
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		case errors.Is(err, service.ErrInvalidOrderStatus):
+			utils.ValidationError(w, "check the status field", map[string]string{
+				"status": err.Error(),
+			})
+		case errors.Is(err, service.ErrNoRestaurantManaged):
+			utils.Error(w, http.StatusForbidden, err.Error())
+		default:
+			log.Printf("manager orders: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to retrieve orders")
+		}
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "orders retrieved", orders)
+}

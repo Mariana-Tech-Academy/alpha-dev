@@ -21,6 +21,7 @@ var (
 	ErrOrderForbidden             = errors.New("you cannot manage orders for this restaurant")
 	ErrInvalidOrderStatus         = errors.New("status must be one of: pending, confirmed, preparing, ready_for_delivery, out_for_delivery, delivered, cancelled")
 	ErrOrderChanged               = errors.New("order changed; refresh and try again")
+	ErrNoRestaurantManaged        = errors.New("no restaurant assigned to this manager")
 )
 
 type OrderTransitionError struct {
@@ -106,6 +107,7 @@ type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
 	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
 	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error)
+	GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error)
 }
 
 type orderService struct {
@@ -288,4 +290,62 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role 
 		Status:      fresh.Status,
 		UpdatedAt:   fresh.UpdatedAt,
 	}, nil
+}
+
+func (s *orderService) GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error) {
+	if managerID == 0 {
+		return nil, ErrInvalidUser
+	}
+
+	var status models.OrderStatus
+	if strings.TrimSpace(statusStr) != "" {
+		status = models.OrderStatus(strings.TrimSpace(statusStr))
+		if !status.IsValid() {
+			return nil, ErrInvalidOrderStatus
+		}
+	}
+
+	restaurantID, err := s.orderRepo.GetRestaurantIDByManager(ctx, managerID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNoRestaurantManaged
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	orders, err := s.orderRepo.GetOrdersByRestaurant(ctx, restaurantID, status)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]models.ManagerOrderResponse, 0, len(orders))
+	for _, order := range orders {
+		items := make([]models.ManagerOrderItemResponse, 0, len(order.Items))
+		for _, item := range order.Items {
+			items = append(items, models.ManagerOrderItemResponse{
+				MenuItemID: item.MenuItemID,
+				Name:       item.Name,
+				UnitPrice:  item.UnitPrice,
+				Quantity:   item.Quantity,
+				LineTotal:  item.LineTotal,
+			})
+		}
+		response = append(response, models.ManagerOrderResponse{
+			ID:                   order.ID,
+			OrderNumber:          order.OrderNumber,
+			Status:               order.Status,
+			Subtotal:             order.Subtotal,
+			DeliveryFee:          order.DeliveryFee,
+			Total:                order.Total,
+			DeliveryName:         order.DeliveryName,
+			DeliveryPhone:        order.DeliveryPhone,
+			DeliveryAddress:      order.DeliveryAddress,
+			DeliveryCity:         order.DeliveryCity,
+			DeliveryState:        order.DeliveryState,
+			DeliveryInstructions: order.DeliveryInstructions,
+			Items:                items,
+			CreatedAt:            order.CreatedAt,
+		})
+	}
+	return response, nil
 }
