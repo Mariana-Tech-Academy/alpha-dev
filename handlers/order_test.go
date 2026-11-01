@@ -41,6 +41,16 @@ func (u unusedOrderRepo) PlaceOrder(context.Context, uint, *models.Order) (*mode
 	return nil, nil
 }
 
+// Add these methods to unusedOrderRepo in handlers/order_test.go
+
+func (r unusedOrderRepo) GetOrdersByRestaurant(ctx context.Context, restaurantID uint, status models.OrderStatus) ([]models.Order, error) {
+    return []models.Order{}, nil
+}
+
+func (r unusedOrderRepo) GetRestaurantIDByManager(ctx context.Context, managerID uint) (uint, error) {
+    return 0, nil
+}
+
 func TestPlaceOrderInvalidDeliveryReturns422(t *testing.T) {
 	handler := NewOrderHandler(service.NewOrderService(unusedOrderRepo{t}))
 
