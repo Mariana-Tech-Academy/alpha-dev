@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ var (
 	ErrEmptyCart                  = errors.New("your cart is empty")
 	ErrCheckoutRestaurantInactive = errors.New("restaurant is not active")
 	ErrCheckoutItemUnavailable    = errors.New("one or more menu items are unavailable")
+	ErrNoRestaurantManaged        = errors.New("no restaurant assigned to this manager")
 )
 
 const (
@@ -78,6 +80,7 @@ const maxOrderPageSize = 20
 type OrderService interface {
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
 	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
+	GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error)
 }
 
 type orderService struct {
@@ -213,4 +216,69 @@ func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, pag
 		Limit:  limit,
 		Total:  total,
 	}, nil
+}
+
+func (s *orderService) GetManagerOrders(ctx context.Context, managerID uint, statusStr string) ([]models.ManagerOrderResponse, error) {
+	// Retrieve the restaurant ID managed by this manager
+	restaurantID, err := s.orderRepo.GetRestaurantIDByManager(ctx, managerID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRestaurantNotFound) {
+			return nil, ErrNoRestaurantManaged
+		}
+		return nil, err
+	}
+
+	// Parse the status string into the OrderStatus type, if provided
+	var status models.OrderStatus
+	if statusStr != "" {
+		status = models.OrderStatus(statusStr)
+	}
+
+	// Fetch orders for this restaurant
+	orders, err := s.orderRepo.GetOrdersByRestaurant(ctx, restaurantID, status)
+	if err != nil {
+		return nil, err
+	}
+
+	// Map entities to response DTOs with minor-to-major currency conversion
+	var response []models.ManagerOrderResponse
+	for _, order := range orders {
+		var itemResponses []models.ManagerOrderItemResponse
+		for _, item := range order.Items {
+			itemResponses = append(itemResponses, models.ManagerOrderItemResponse{
+				MenuItemID: item.MenuItemID,
+				Name:       item.Name,
+				UnitPrice:  float64(item.UnitPrice) / 100.0,
+				Quantity:   item.Quantity,
+				LineTotal:  float64(item.LineTotal) / 100.0,
+			})
+		}
+
+		// Consolidate delivery snapshot fields into a clean presentation string
+		fullAddress := fmt.Sprintf("%s, %s, %s", order.DeliveryAddress, order.DeliveryCity, order.DeliveryState)
+
+		// If delivery instructions are empty, provide a default message
+		instructions := order.DeliveryInstructions
+		if instructions == "" {
+			instructions = "No delivery instructions provided"
+		}
+
+		// Append the mapped order to the response slice
+		response = append(response, models.ManagerOrderResponse{
+			ID:                   order.ID,
+			OrderNumber:          order.OrderNumber,
+			Status:               order.Status,
+			Subtotal:             float64(order.Subtotal) / 100.0,
+			DeliveryFee:          float64(order.DeliveryFee) / 100.0,
+			Total:                float64(order.Total) / 100.0,
+			DeliveryName:         order.DeliveryName,
+			DeliveryPhone:        order.DeliveryPhone,
+			DeliveryAddress:      fullAddress,
+			DeliveryInstructions: instructions,
+			Items:                itemResponses,
+			CreatedAt:            order.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	return response, nil
 }

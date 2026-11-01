@@ -34,4 +34,7 @@ func OrderRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	staff.Use(middleware.RequireRole(models.RoleManager, models.RoleAdmin))
 
 	_, _ = authed, staff
+
+	//Manager can view orders for their restaurant, optionally filtered by status.
+	staff.HandleFunc("/manager/orders", orderHandler.GetManagerOrders).Methods(http.MethodGet)
 }

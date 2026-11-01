@@ -97,3 +97,29 @@ func (h *OrderHandler) GetOrderHistory(w http.ResponseWriter, r *http.Request) {
 
 	utils.Success(w, http.StatusOK, "orders retrieved", history)
 }
+
+func (h *OrderHandler) GetManagerOrders(w http.ResponseWriter, r *http.Request) {
+	//Retrieve userID claims from context
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	//Read optional status query parameter (e.g., ?status=preparing)
+	statusStr := r.URL.Query().Get("status")
+
+	//Call the service to get orders for the manager's restaurant, filtered by status if provided
+	orders, err := h.OrderService.GetManagerOrders(r.Context(), claims.UserID, statusStr)
+	if err != nil {
+		if errors.Is(err, service.ErrNoRestaurantManaged) {
+			utils.Error(w, http.StatusForbidden, "no restaurant assigned to this manager")
+			return
+		}
+		log.Printf("get manager orders error: %v", err)
+		utils.Error(w, http.StatusInternalServerError, "unable to retrieve orders")
+		return
+	}
+
+	utils.Success(w, http.StatusOK, "orders retrieved successfully", orders)
+}

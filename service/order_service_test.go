@@ -36,6 +36,14 @@ func (f *fakeOrderRepo) PlaceOrder(_ context.Context, _ uint, order *models.Orde
 	return order, nil
 }
 
+func (f *fakeOrderRepo) GetRestaurantIDByManager(context.Context, uint) (uint, error) {
+	return 1, nil
+}
+
+func (f *fakeOrderRepo) GetOrdersByRestaurant(context.Context, uint, models.OrderStatus) ([]models.Order, error) {
+	return []models.Order{}, nil
+}
+
 var _ repository.OrderRepository = (*fakeOrderRepo)(nil)
 
 func validDelivery() PlaceOrderRequest {
