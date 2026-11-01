@@ -146,3 +146,5 @@ func TestAddCartItem(t *testing.T) {
 		}
 	})
 }
+
+func (f *fakeCartRepo) RemoveItems(context.Context, uint, *uint) error { return nil }

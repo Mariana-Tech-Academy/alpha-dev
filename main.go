@@ -41,24 +41,31 @@ func main() {
 		log.Fatal("failed to open db: ", err)
 	}
 
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.Restaurant{},
-		&models.Category{},
-		&models.MenuItem{},
-		&models.Cart{},
-		&models.CartItem{},
-		&models.Order{},
-		&models.OrderItem{},
-		&models.RevokedToken{},
-		&models.OrderDailySequence{},
+	revokedTokens := repository.NewRevokedTokenRepository(db)
+	err = runStartupTasks(cfg.DemoSafeStart,
+		func() error { return verifyDemoDatabase(db) },
+		func() error {
+			return db.AutoMigrate(
+				&models.User{},
+				&models.Restaurant{},
+				&models.Category{},
+				&models.MenuItem{},
+				&models.Cart{},
+				&models.CartItem{},
+				&models.Order{},
+				&models.OrderItem{},
+				&models.RevokedToken{},
+				&models.OrderDailySequence{},
+			)
+		},
+		func() { go cleanupRevokedTokens(revokedTokens, time.Hour) },
 	)
 	if err != nil {
-		log.Fatal("failed to automigrate: ", err)
+		log.Fatal("startup checks/tasks failed: ", err)
 	}
-
-	revokedTokens := repository.NewRevokedTokenRepository(db)
-	go cleanupRevokedTokens(revokedTokens, time.Hour)
+	if cfg.DemoSafeStart {
+		log.Print("LOCAL DEMO SAFE START: database identity verified; AutoMigrate and expired-token cleanup skipped; JWT/revocation checks remain enabled")
+	}
 
 	tokens := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpiry, revokedTokens)
 	router := routes.Router(db, tokens)

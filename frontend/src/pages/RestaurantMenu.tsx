@@ -4,6 +4,7 @@ import { api } from "../api/foodhub";
 import { useAuth } from "../auth/context";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, FoodImage, Loading } from "../components/ui";
+import { hasMenuPhoto } from "../utils/images";
 import { money } from "../utils/format";
 export function RestaurantMenu() {
   const { id = "" } = useParams();
@@ -37,9 +38,12 @@ export function RestaurantMenu() {
   }
   if (loading) return <Loading label="Loading the menu…" />;
   if (error || !data) return <ErrorMessage error={error} retry={retry} />;
+  const menuItems = data.menu_items.filter((item) =>
+    hasMenuPhoto(item.image_url),
+  );
   const categories = [
     "All",
-    ...new Set(data.menu_items.map((item) => item.category).filter(Boolean)),
+    ...new Set(menuItems.map((item) => item.category).filter(Boolean)),
   ];
   const activeCategory = categories.includes(category) ? category : "All";
   return (
@@ -91,13 +95,13 @@ export function RestaurantMenu() {
           {message} <Link to="/cart">View cart →</Link>
         </p>
       )}
-      {!data.menu_items.length ? (
+      {!menuItems.length ? (
         <Empty title="Nothing on the menu just yet">
           <p>Please check back for available dishes.</p>
         </Empty>
       ) : (
         <div className="menu-grid">
-          {data.menu_items
+          {menuItems
             .filter(
               (item) =>
                 activeCategory === "All" || item.category === activeCategory,

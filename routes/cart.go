@@ -24,6 +24,8 @@ func CartRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	customer := protected(router, tokens)
 	customer.Use(middleware.RequireRole(models.RoleCustomer))
 
+	customer.HandleFunc("/cart", cartHandler.RemoveItems).Methods(http.MethodDelete)
+	customer.HandleFunc("/cart/items/{id}", cartHandler.RemoveItems).Methods(http.MethodDelete)
 	customer.HandleFunc("/cart", cartHandler.GetCart).Methods(http.MethodGet)
 	customer.HandleFunc("/cart/items", cartHandler.AddItem).Methods(http.MethodPost)
 	customer.HandleFunc("/cart/items/{id}", cartHandler.UpdateQuantity).Methods(http.MethodPut)

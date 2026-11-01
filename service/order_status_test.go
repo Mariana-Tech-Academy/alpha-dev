@@ -180,3 +180,82 @@ func mustTransition(order UpdatedOrder, err error) *OrderTransitionError {
 	}
 	return transition
 }
+
+func TestCompleteNativeOrderFlowAndCancellationPolicy(t *testing.T) {
+	flow := []models.OrderStatus{models.OrderStatusPending, models.OrderStatusConfirmed, models.OrderStatusPreparing, models.OrderStatusReadyForDelivery, models.OrderStatusOutForDelivery, models.OrderStatusDelivered}
+	repo := &statusOrderRepo{order: pendingOrder()}
+	svc := NewOrderService(repo)
+	for _, next := range flow[1:] {
+		result, err := svc.UpdateOrderStatus(context.Background(), 4, models.RoleManager, 9, next)
+		if err != nil || result.Status != next {
+			t.Fatalf("step %s: %+v %v", next, result, err)
+		}
+	}
+	for _, from := range append(flow, models.OrderStatusCancelled) {
+		for _, next := range append(flow, models.OrderStatusCancelled) {
+			repo.order.Status = from
+			allowed, ok := from.Next()
+			_, err := svc.UpdateOrderStatus(context.Background(), 4, models.RoleManager, 9, next)
+			if (err == nil) != (ok && next == allowed) {
+				t.Fatalf("transition %s -> %s: %v", from, next, err)
+			}
+			if err != nil && repo.order.Status != from {
+				t.Fatal("rejected transition changed order")
+			}
+		}
+	}
+}
+
+func TestDemoLifecyclePersistsFourStages(t *testing.T) {
+	repo := &statusOrderRepo{order: pendingOrder()}
+	svc := NewOrderService(repo)
+	for _, step := range []struct{ from, to models.OrderStatus }{
+		{models.OrderStatusPending, models.OrderStatusPreparing},
+		{models.OrderStatusPreparing, models.OrderStatusOutForDelivery},
+		{models.OrderStatusOutForDelivery, models.OrderStatusDelivered},
+	} {
+		got, err := svc.AdvanceDemoOrder(context.Background(), 4, models.RoleManager, 9, step.from)
+		if err != nil || got.Status != step.to || repo.order.Status != step.to || repo.sawCurrent != step.from {
+			t.Fatalf("step %+v got %+v err %v", step, got, err)
+		}
+		stored, err := repo.FindByID(context.Background(), 9)
+		if err != nil || stored.Status != step.to {
+			t.Fatal("status not persisted")
+		}
+	}
+}
+func TestDemoLifecycleRejectsUnauthorisedAndStaleRequests(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		user              uint
+		role              models.Role
+		expected, current models.OrderStatus
+		stale             bool
+		want              error
+	}{
+		{name: "customer", user: 4, role: models.RoleCustomer, expected: models.OrderStatusPending, current: models.OrderStatusPending, want: ErrOrderForbidden},
+		{name: "other manager", user: 8, role: models.RoleManager, expected: models.OrderStatusPending, current: models.OrderStatusPending, want: ErrOrderForbidden},
+		{name: "unauthenticated", role: models.RoleAdmin, expected: models.OrderStatusPending, current: models.OrderStatusPending, want: ErrInvalidUser},
+		{name: "stale expected status", user: 4, role: models.RoleManager, expected: models.OrderStatusPreparing, current: models.OrderStatusPending, want: ErrOrderChanged},
+		{name: "concurrent update", user: 4, role: models.RoleManager, expected: models.OrderStatusPending, current: models.OrderStatusPending, stale: true, want: ErrOrderChanged},
+		{name: "invalid status", user: 4, role: models.RoleManager, expected: "complete", current: models.OrderStatusPending, want: ErrInvalidOrderStatus},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &statusOrderRepo{order: pendingOrder(), stale: tc.stale}
+			repo.order.Status = tc.current
+			_, err := NewOrderService(repo).AdvanceDemoOrder(context.Background(), tc.user, tc.role, 9, tc.expected)
+			if !errors.Is(err, tc.want) || repo.order.Status != tc.current {
+				t.Fatalf("error %v state %s", err, repo.order.Status)
+			}
+		})
+	}
+	for _, terminal := range []models.OrderStatus{models.OrderStatusDelivered, models.OrderStatusCancelled} {
+		repo := &statusOrderRepo{order: pendingOrder()}
+		repo.order.Status = terminal
+		_, err := NewOrderService(repo).AdvanceDemoOrder(context.Background(), 99, models.RoleAdmin, 9, terminal)
+		var transition *OrderTransitionError
+		if !errors.As(err, &transition) || repo.order.Status != terminal {
+			t.Fatal("terminal state changed")
+		}
+	}
+}

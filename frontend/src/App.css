@@ -338,14 +338,12 @@
   width: 100%;
   height: 100%;
   min-height: 100px;
-  background:
-    radial-gradient(circle at 65% 35%, #e3d6ad, transparent 50%),
-    linear-gradient(135deg, #e7edd9, #cad8b9);
+  background: #f0eeea;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #63774a;
+  color: #797b76;
 }
 .image-placeholder > span {
   font-size: 56px;
@@ -1147,5 +1145,141 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Local artwork stays sharp while preserving each dish's composition. */
+.food-image.illustrated img {
+  object-fit: cover;
+}
+.illustration-label {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  color: #42533a;
+  background: #fffaf0e8;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+}
+.image-placeholder svg {
+  display: block;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+@media (max-width: 720px) {
+  .illustration-label {
+    font-size: 8px;
+    padding: 1px 5px;
+    bottom: 5px;
+    right: 5px;
+  }
+}
+
+/* Proportional photo exports retain the whole serving in the responsive frame. */
+.food-image:not(.illustrated) {
+  background: #eee8dd;
+}
+.food-image:not(.illustrated) img {
+  object-fit: contain;
+}
+.restaurant-card > .food-image:not(.illustrated) img,
+.restaurant-banner > .food-image:not(.illustrated) img {
+  object-fit: cover;
+  object-position: center;
+}
+.restaurant-card img[src*="/photos/covers/"],
+.restaurant-banner img[src*="/photos/covers/"] {
+  object-position: center 62%;
+}
+
+.history-card {
+  flex-wrap: wrap;
+}
+.history-details {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+.history-details summary {
+  cursor: pointer;
+  color: var(--green, #345329);
+  padding: 10px 0;
+  font-weight: 600;
+}
+.history-detail-body {
+  border-top: 1px solid #e8ecdf;
+  padding-top: 12px;
+  overflow-wrap: anywhere;
+}
+.history-detail-body h4 {
+  margin: 14px 0 10px;
+}
+.history-detail-body address {
+  font-style: normal;
+  line-height: 1.6;
+}
+.purchased-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.purchased-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+.purchased-items small {
+  display: block;
+  color: #64705e;
+  margin-top: 4px;
+}
+.purchased-items strong {
+  white-space: nowrap;
+}
+
+.local-demo-status {
+  margin-bottom: 24px;
+  border: 2px solid #b78b30;
+}
+.local-demo-status h2 {
+  font-size: 18px;
+}
+.local-demo-status label {
+  display: block;
+  margin: 12px 0;
+}
+.local-demo-status input,
+.local-demo-status select {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  margin-top: 6px;
+  padding: 10px;
+}
+
+.hero-photograph > .food-image {
+  width: 100%;
+  max-width: 390px;
+  height: 290px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 12px 24px 25px #31432a23;
+}
+.hero-photograph > .food-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@media (max-width: 720px) {
+  .hero-art.hero-photograph {
+    transform: none;
+    height: auto;
+  }
+  .hero-photograph > .food-image {
+    max-width: none;
+    height: 225px;
   }
 }

@@ -90,12 +90,12 @@ func TestCheckoutSummary(t *testing.T) {
 				cartLine(2, "Fried Chicken", 1, 550000, restaurantID),
 			},
 		}
-		got, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 200000).
+		got, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}).
 			Summary(context.Background(), 4)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got.Subtotal != 1450000 || got.DeliveryFee != 200000 || got.Total != 1650000 {
+		if got.Subtotal != 1450000 || got.DeliveryFee != 299 || got.Total != 1450299 {
 			t.Fatalf("summary = %+v", got)
 		}
 		if got.Restaurant.ID != 3 || got.Restaurant.Name != "Mama Put" {
@@ -110,7 +110,7 @@ func TestCheckoutSummary(t *testing.T) {
 	})
 
 	t.Run("no cart is empty", func(t *testing.T) {
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{err: gorm.ErrRecordNotFound}, 0).
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{err: gorm.ErrRecordNotFound}).
 			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrEmptyCart) {
 			t.Fatalf("err = %v", err)
@@ -122,7 +122,7 @@ func TestCheckoutSummary(t *testing.T) {
 			RestaurantID: &restaurantID,
 			Restaurant:   restaurant,
 		}
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}).
 			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrEmptyCart) {
 			t.Fatalf("err = %v", err)
@@ -130,7 +130,7 @@ func TestCheckoutSummary(t *testing.T) {
 	})
 
 	t.Run("invalid user", func(t *testing.T) {
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{}, 0).
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{}).
 			Summary(context.Background(), 0)
 		if !errors.Is(err, ErrInvalidUser) {
 			t.Fatalf("err = %v", err)
@@ -147,7 +147,7 @@ func TestCheckoutSummary(t *testing.T) {
 				cartLine(1, "Jollof Rice", 1, 450000, restaurantID),
 			},
 		}
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}).
 			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrCheckoutRestaurantInactive) {
 			t.Fatalf("err = %v", err)
@@ -162,7 +162,7 @@ func TestCheckoutSummary(t *testing.T) {
 			Restaurant:   restaurant,
 			Items:        []models.CartItem{line},
 		}
-		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}, 0).
+		_, err := NewCheckoutService(&fakeCheckoutCartRepo{cart: cart}).
 			Summary(context.Background(), 4)
 		if !errors.Is(err, ErrCheckoutItemUnavailable) {
 			t.Fatalf("err = %v", err)
@@ -234,3 +234,5 @@ func TestUpdateCartQuantity(t *testing.T) {
 		t.Fatalf("expected item not found, got %v", err)
 	}
 }
+
+func (f *fakeCheckoutCartRepo) RemoveItems(context.Context, uint, *uint) error { return nil }

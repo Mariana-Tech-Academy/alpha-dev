@@ -7,4 +7,15 @@ export const date = (value: string) =>
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-export const statusLabel = (value: string) => value.replaceAll("_", " ");
+export function statusLabel(value: string) {
+  const labels: Record<string, string> = {
+    pending: "Pending",
+    confirmed: "Pending",
+    preparing: "In Progress",
+    ready_for_delivery: "In Progress",
+    out_for_delivery: "Out for Delivery",
+    delivered: "Complete",
+    cancelled: "Cancelled",
+  };
+  return labels[value] || value.replaceAll("_", " ");
+}

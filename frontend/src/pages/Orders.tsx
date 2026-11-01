@@ -1,6 +1,9 @@
 import { useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../api/foodhub";
+import { LocalDemoStatus } from "../components/LocalDemoStatus";
+import { localDemoAvailable } from "../utils/demo";
+import { OrderDetails } from "../components/OrderDetails";
 import type { PlacedOrder } from "../api/types";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, Loading, Status, Totals } from "../components/ui";
@@ -24,6 +27,9 @@ export function Orders() {
           Refresh
         </button>
       </div>
+      {localDemoAvailable() && (
+        <LocalDemoStatus orders={data?.orders || []} onUpdated={retry} />
+      )}
       {loading ? (
         <Loading label="Finding your orders…" />
       ) : error ? (
@@ -46,12 +52,7 @@ export function Orders() {
               </div>
               <Status value={order.status} />
               <strong>{money(order.total)}</strong>
-              <Link
-                className="text-button"
-                to={`/restaurants/${order.restaurant_id}`}
-              >
-                View restaurant →
-              </Link>
+              <OrderDetails order={order} />
             </article>
           ))}
         </div>

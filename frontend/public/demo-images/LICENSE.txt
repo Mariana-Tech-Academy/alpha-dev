@@ -1,0 +1,24 @@
+FoodHub original demo food artwork — CC0 1.0 Universal
+
+This dedication covers the 45 original PNG food illustrations listed in
+manifest.json and their editable SVG sources under tools/seed-foodhub/image-sources.
+The artwork was created for this fictional FoodHub presentation with Codex using
+original vector shapes. No third-party photos, fonts, logos, traced artwork or
+scraped images are incorporated.
+
+To the extent copyright and related rights exist and can be waived, the artwork
+is dedicated to the public domain under CC0 1.0 Universal. Copying, modifying and
+redistributing these assets is permitted without attribution. No warranties or
+endorsement are provided. This does not change the licence of the application,
+its dependencies or unrelated assets.
+
+Canonical dedication and full legal code:
+https://creativecommons.org/publicdomain/zero/1.0/
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+The pictures depict illustrative servings for fictional restaurants; they are
+not photographs, promises of portion size or evidence of ingredients/allergens.
+
+EXCLUSION: files under photos/ are third-party Pexels photographs, NOT covered by
+this CC0 dedication. See photos/ATTRIBUTION.md, photos/manifest.json and
+https://www.pexels.com/license/ for their credits, conditions and verification.

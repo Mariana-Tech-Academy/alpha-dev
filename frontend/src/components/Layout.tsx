@@ -88,7 +88,15 @@ export function Layout() {
           </Link>
           <p>A good meal brings us together.</p>
         </div>
-        <span>FoodHub UK demo · All prices in GBP</span>
+        <span>
+          FoodHub UK demo · All prices in GBP
+          <br />
+          <a
+            href={`${import.meta.env.BASE_URL}demo-images/photos/gallery.html`}
+          >
+            Photo credits
+          </a>
+        </span>
       </footer>
     </>
   );

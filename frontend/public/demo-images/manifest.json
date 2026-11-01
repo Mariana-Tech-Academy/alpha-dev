@@ -1,0 +1,362 @@
+[
+  {
+    "path": "/demo-images/menu/burger-district/classic-smash.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/classic-smash.svg",
+    "label": "Classic Smash Burger",
+    "license": "CC0-1.0",
+    "bytes": 8773,
+    "sha256": "f737713c991c2e9ed5c181c55c7d4f73864dee129ab3ef09166b298e4b2e0827"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/smoky-bbq.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/smoky-bbq.svg",
+    "label": "Smoky BBQ Bacon Burger",
+    "license": "CC0-1.0",
+    "bytes": 8848,
+    "sha256": "9b6727e608d7f4ebb5a2826f6b398ba890567d3b3728f527a685ecdc4533ef13"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/crispy-chicken.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/crispy-chicken.svg",
+    "label": "Buttermilk Chicken Burger",
+    "license": "CC0-1.0",
+    "bytes": 8707,
+    "sha256": "47b69b28a4564db23b233e4500f9bd26be8bff293da351f7989bab29c353da2d"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/plant-burger.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/plant-burger.svg",
+    "label": "Garden Bean Burger",
+    "license": "CC0-1.0",
+    "bytes": 8583,
+    "sha256": "97e02cbd41a158a3815e112cae34be096e68105d64c67a6afe2b71eab72ce827"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/skin-on-fries.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/skin-on-fries.svg",
+    "label": "Sea Salt Skin-on Fries",
+    "license": "CC0-1.0",
+    "bytes": 12970,
+    "sha256": "9151d4360f2e27c169b222a05aaa4e749afa17ec93ae7d00d7584e2bebbf371f"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/loaded-fries.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/loaded-fries.svg",
+    "label": "Loaded Cheese Fries",
+    "license": "CC0-1.0",
+    "bytes": 12775,
+    "sha256": "dcd3ac82fbdec3b1d3bd3a419bcf9e598f4511dfa96853a3108cb64b153aaeb0"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/buffalo-wings.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/buffalo-wings.svg",
+    "label": "Buffalo Wings (6 pieces)",
+    "license": "CC0-1.0",
+    "bytes": 10102,
+    "sha256": "b83df73dc4062406eeca61eb9b9e56c357d0b2a2d955403a3acb04602a773a10"
+  },
+  {
+    "path": "/demo-images/menu/burger-district/bbq-wings.png",
+    "source": "tools/seed-foodhub/image-sources/menu/burger-district/bbq-wings.svg",
+    "label": "Sticky BBQ Wings (6 pieces)",
+    "license": "CC0-1.0",
+    "bytes": 9982,
+    "sha256": "48364aade870ec678ce2ce6971660b9196cc87b426b6e803e63304ff112c9031"
+  },
+  {
+    "path": "/demo-images/covers/burger-district.png",
+    "source": "tools/seed-foodhub/image-sources/covers/burger-district.svg",
+    "label": "Burger District cover",
+    "license": "CC0-1.0",
+    "bytes": 19070,
+    "sha256": "cef44bcd2f9b349614059e48d09f4820f975c2a6b7405b09d925267778f08d7f"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/margherita.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/margherita.svg",
+    "label": "Margherita Pizza (12 inch)",
+    "license": "CC0-1.0",
+    "bytes": 13730,
+    "sha256": "05ca45b325d2f9dbad3625d9d1f54c9b6e3f71b9828ddb39da0a5d21ed3a0309"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/pepperoni.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/pepperoni.svg",
+    "label": "Pepperoni Pizza (12 inch)",
+    "license": "CC0-1.0",
+    "bytes": 14934,
+    "sha256": "1a23c28eb11ee72e3ee7a5d3cf95bbdca0942df7c28d2cdb903889ae91cc2489"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/roast-veg.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/roast-veg.svg",
+    "label": "Roasted Vegetable Pizza (12 inch)",
+    "license": "CC0-1.0",
+    "bytes": 14025,
+    "sha256": "0dbb9a67487ee94b62821a4285f39f80373796203016265c092005b5184fe9a5"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/bolognese.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/bolognese.svg",
+    "label": "Spaghetti Bolognese",
+    "license": "CC0-1.0",
+    "bytes": 14053,
+    "sha256": "3b644785c1039146cf40344fa05f6184e9ff8a0cd9da426d436c8935ce93d323"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/alfredo.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/alfredo.svg",
+    "label": "Chicken Mushroom Tagliatelle",
+    "license": "CC0-1.0",
+    "bytes": 13860,
+    "sha256": "44ac0e78358e9db24a46d917745c3ea207d0bc2f1e86fd4f3c55c1cae85cd09e"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/arrabbiata.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/arrabbiata.svg",
+    "label": "Penne Arrabbiata",
+    "license": "CC0-1.0",
+    "bytes": 13100,
+    "sha256": "0a7c256d4b3db7b240622722f5fd746fc41e1e55b2fb3d5aea61ee669b0b0f3b"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/garlic-bread.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/garlic-bread.svg",
+    "label": "Cheesy Garlic Bread",
+    "license": "CC0-1.0",
+    "bytes": 10922,
+    "sha256": "dfe18e477fabf707a0f11e8cfa250726e6be891d2e1662989247f311f60a9503"
+  },
+  {
+    "path": "/demo-images/menu/bella-italia-kitchen/lasagne.png",
+    "source": "tools/seed-foodhub/image-sources/menu/bella-italia-kitchen/lasagne.svg",
+    "label": "Classic Beef Lasagne",
+    "license": "CC0-1.0",
+    "bytes": 9285,
+    "sha256": "da03a883feb4bce99a427b3a4af5a343fce1b00fe94d671aafd457d52f2fa4ce"
+  },
+  {
+    "path": "/demo-images/covers/bella-italia-kitchen.png",
+    "source": "tools/seed-foodhub/image-sources/covers/bella-italia-kitchen.svg",
+    "label": "Bella Italia Kitchen cover",
+    "license": "CC0-1.0",
+    "bytes": 31246,
+    "sha256": "0bfcb3c050d56c0ebd3067d9557fb04bbaf647f446a2a359b92f849147b19d3f"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/chicken-biryani.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/chicken-biryani.svg",
+    "label": "Chicken Dum Biryani",
+    "license": "CC0-1.0",
+    "bytes": 14451,
+    "sha256": "4de753e708afa77ea072e18e940c87b22b882dcbb71687d8dcba325e663c60e9"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/vegetable-biryani.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/vegetable-biryani.svg",
+    "label": "Vegetable Biryani",
+    "license": "CC0-1.0",
+    "bytes": 14607,
+    "sha256": "4c07e0de2055b65e0d5cc321286e5b2f978c07db20084138c193014fdb391560"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/butter-chicken.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/butter-chicken.svg",
+    "label": "Butter Chicken",
+    "license": "CC0-1.0",
+    "bytes": 11087,
+    "sha256": "41e861d25bdb49328fc184ada5f25a47c3ea9ab82e5f0d9bad56d1e34e20cf0c"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/chana-masala.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/chana-masala.svg",
+    "label": "Chana Masala",
+    "license": "CC0-1.0",
+    "bytes": 11065,
+    "sha256": "f810922417e2a37627b66f56885398a85bb6cb300fcf3cf348492ac2b02608f2"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/palak-paneer.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/palak-paneer.svg",
+    "label": "Palak Paneer",
+    "license": "CC0-1.0",
+    "bytes": 11067,
+    "sha256": "0cf6135655fbcbeb25078409378bd2436279e91f755f7014e95fe67dcdcff3eb"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/garlic-naan.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/garlic-naan.svg",
+    "label": "Garlic and Coriander Naan",
+    "license": "CC0-1.0",
+    "bytes": 11825,
+    "sha256": "aab89199441a2210e1b2f9a560d25f6a41ca42571a4ba176d7da6342b3199925"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/pilau-rice.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/pilau-rice.svg",
+    "label": "Basmati Pilau Rice",
+    "license": "CC0-1.0",
+    "bytes": 14691,
+    "sha256": "a280d132710af15264abf339224a168946659647a7e8d56a6eaa9e672c246f88"
+  },
+  {
+    "path": "/demo-images/menu/spice-route/lamb-rogan-josh.png",
+    "source": "tools/seed-foodhub/image-sources/menu/spice-route/lamb-rogan-josh.svg",
+    "label": "Lamb Rogan Josh",
+    "license": "CC0-1.0",
+    "bytes": 11087,
+    "sha256": "41e861d25bdb49328fc184ada5f25a47c3ea9ab82e5f0d9bad56d1e34e20cf0c"
+  },
+  {
+    "path": "/demo-images/covers/spice-route.png",
+    "source": "tools/seed-foodhub/image-sources/covers/spice-route.svg",
+    "label": "Spice Route cover",
+    "license": "CC0-1.0",
+    "bytes": 35258,
+    "sha256": "5b8e6b8a3dea8643a49ee93a69c9cc1095f7d6295cb5cc44921e0ff0d62dd93c"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/chicken-wrap.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/chicken-wrap.svg",
+    "label": "Chicken Shawarma Wrap",
+    "license": "CC0-1.0",
+    "bytes": 10147,
+    "sha256": "cb3d76e61eae458a4cab2816001d51a2aa8bad0f0472fb929cf626667de927da"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/lamb-wrap.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/lamb-wrap.svg",
+    "label": "Lamb Shawarma Wrap",
+    "license": "CC0-1.0",
+    "bytes": 10053,
+    "sha256": "18cff67d2605c5ae0a04f6b7b7cf0eb28e5583ffa809bf8e4f89ac6346b8f630"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/falafel-wrap.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/falafel-wrap.svg",
+    "label": "Falafel and Hummus Wrap",
+    "license": "CC0-1.0",
+    "bytes": 10043,
+    "sha256": "2fa73895d436d73aa7124f60d4c0e44928d59f7043d60c444239fe1a6a070ec6"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/chicken-platter.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/chicken-platter.svg",
+    "label": "Chicken Shawarma Rice Platter",
+    "license": "CC0-1.0",
+    "bytes": 10382,
+    "sha256": "e0a5bdefe916b9e0abebc429c4f12468bfbbdd6dab15bd910a9d56a1a0422853"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/kofta.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/kofta.svg",
+    "label": "Lamb Kofta Grill",
+    "license": "CC0-1.0",
+    "bytes": 10511,
+    "sha256": "630f9396963207a355ef7d5180fa507af57a70b70c3f93a4f6191f41b1e68983"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/hummus.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/hummus.svg",
+    "label": "Hummus and Flatbread",
+    "license": "CC0-1.0",
+    "bytes": 11030,
+    "sha256": "449ef48ccbea75987f8fce74f42e98f693445e228114aab47eab902859b644c4"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/falafel-box.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/falafel-box.svg",
+    "label": "Falafel Bites (5 pieces)",
+    "license": "CC0-1.0",
+    "bytes": 9666,
+    "sha256": "97df73e5820d98d00abb8661e933b9e6a17335c4540ab938bac7eb1aeb8719e4"
+  },
+  {
+    "path": "/demo-images/menu/shawarma-house/mixed-grill.png",
+    "source": "tools/seed-foodhub/image-sources/menu/shawarma-house/mixed-grill.svg",
+    "label": "House Mixed Grill",
+    "license": "CC0-1.0",
+    "bytes": 10190,
+    "sha256": "027e89c71c69cf33827845dcf4476a42f6342eadc70aca692d6044be6469b85b"
+  },
+  {
+    "path": "/demo-images/covers/shawarma-house.png",
+    "source": "tools/seed-foodhub/image-sources/covers/shawarma-house.svg",
+    "label": "The Shawarma House cover",
+    "license": "CC0-1.0",
+    "bytes": 20958,
+    "sha256": "b56fafa98dc249ac3d4a90f3f300a7c9a9ce8cc92b5f0cf8e5e76be54e877ec2"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/strawberry-waffle.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/strawberry-waffle.svg",
+    "label": "Strawberry Chocolate Waffle",
+    "license": "CC0-1.0",
+    "bytes": 10158,
+    "sha256": "f66972ecf22f082d85a14c0009352415b1c1ced38d530e57c96d816fc79847ec"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/banoffee-waffle.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/banoffee-waffle.svg",
+    "label": "Banoffee Waffle",
+    "license": "CC0-1.0",
+    "bytes": 10300,
+    "sha256": "8a535706168bbe93e42beb6c468e1b1f77cd72fb0b674e2b91878f0930e17f1f"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/brownie.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/brownie.svg",
+    "label": "Warm Chocolate Brownie",
+    "license": "CC0-1.0",
+    "bytes": 9716,
+    "sha256": "34104df6a3023971cf4104a9511f8be8b53e30a68bc168b39e04732e2aceef91"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/cheesecake.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/cheesecake.svg",
+    "label": "Strawberry Cheesecake Slice",
+    "license": "CC0-1.0",
+    "bytes": 9896,
+    "sha256": "1d0c59eba87342db7b301eefe0fdd5c3b1a63eab6876d820b6926424c034abb6"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/chocolate-cake.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/chocolate-cake.svg",
+    "label": "Chocolate Fudge Cake Slice",
+    "license": "CC0-1.0",
+    "bytes": 9497,
+    "sha256": "2421602ef418260e7ce1dc8591674a1e871bcd638b2e17c505153dae35df328a"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/vanilla-shake.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/vanilla-shake.svg",
+    "label": "Vanilla Milkshake",
+    "license": "CC0-1.0",
+    "bytes": 9780,
+    "sha256": "8c2d53a54ce1e9ebdd3f97de0136b93038d84d42f07e804fa2b57502cded0d80"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/cookie-shake.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/cookie-shake.svg",
+    "label": "Cookies and Cream Milkshake",
+    "license": "CC0-1.0",
+    "bytes": 10494,
+    "sha256": "18d785775cd052c1d1ad98320e1d850a5502a831cff814547dd1d562c4e2b60b"
+  },
+  {
+    "path": "/demo-images/menu/sweet-treats-cafe/red-velvet.png",
+    "source": "tools/seed-foodhub/image-sources/menu/sweet-treats-cafe/red-velvet.svg",
+    "label": "Red Velvet Cake Slice",
+    "license": "CC0-1.0",
+    "bytes": 9351,
+    "sha256": "8b2432fa0a370f6857bd16e91c52f995fcf8e222148d90e545390ff850188d4f"
+  },
+  {
+    "path": "/demo-images/covers/sweet-treats-cafe.png",
+    "source": "tools/seed-foodhub/image-sources/covers/sweet-treats-cafe.svg",
+    "label": "Sweet Treats Café cover",
+    "license": "CC0-1.0",
+    "bytes": 21368,
+    "sha256": "cff97a542f612c2a1a42efd4f9e7bca794588e370735dbf8284eac02d54120e0"
+  }
+]

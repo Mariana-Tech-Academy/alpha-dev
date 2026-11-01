@@ -1,6 +1,8 @@
-import { request } from "./client";
+import { localDemoAvailable } from "../utils/demo.ts";
+import { request } from "./client.ts";
 import type {
   Cart,
+  OrderStatus,
   CheckoutSummary,
   DeliveryRequest,
   LoginResult,
@@ -13,6 +15,43 @@ import type {
 } from "./types";
 const json = (value: unknown) => JSON.stringify(value);
 export const api = {
+  demoManagerLogin: (email: string, password: string, signal?: AbortSignal) => {
+    if (!localDemoAvailable())
+      throw new Error("Local demo controls are disabled.");
+    return request<LoginResult>("/auth/login", {
+      method: "POST",
+      body: json({ email, password }),
+      signal,
+    });
+  },
+  demoManagerMe: (staffToken: string, signal?: AbortSignal) => {
+    if (!localDemoAvailable())
+      throw new Error("Local demo controls are disabled.");
+    return request<User>("/auth/me", {
+      headers: { Authorization: `Bearer ${staffToken}` },
+      signal,
+    });
+  },
+  advanceDemoOrder: (
+    id: number,
+    status: OrderStatus,
+    staffToken: string,
+    signal?: AbortSignal,
+  ) => {
+    if (!localDemoAvailable())
+      throw new Error("Local demo controls are disabled.");
+    return request<{
+      id: number;
+      order_number: string;
+      status: OrderStatus;
+      updated_at: string;
+    }>(`/demo/orders/${id}/advance`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${staffToken}` },
+      body: json({ expected_status: status }),
+      signal,
+    });
+  },
   register: (data: RegisterRequest) =>
     request<User>("/auth/register", { method: "POST", body: json(data) }),
   login: (email: string, password: string) =>
@@ -50,6 +89,9 @@ export const api = {
       { method: "PUT", body: json({ quantity }) },
       true,
     ),
+  removeItem: (id: number) =>
+    request<Cart>(`/cart/items/${id}`, { method: "DELETE" }, true),
+  clearCart: () => request<Cart>("/cart", { method: "DELETE" }, true),
   summary: (signal?: AbortSignal) =>
     request<CheckoutSummary>("/checkout/summary", { signal }, true),
   placeOrder: (data: DeliveryRequest) =>

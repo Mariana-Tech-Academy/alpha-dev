@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
+import { BasketTotals } from "../components/BasketTotals";
 import { api } from "../api/foodhub";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, Loading } from "../components/ui";
@@ -12,11 +13,17 @@ export function Cart() {
   const [busy, setBusy] = useState<number | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const cart = updated || data;
-  async function change(id: number, quantity: number) {
+  async function change(id: number, quantity?: number) {
     setBusy(id);
     setActionError(null);
     try {
-      setUpdated(await api.updateQuantity(id, quantity));
+      setUpdated(
+        await (quantity !== undefined
+          ? api.updateQuantity(id, quantity)
+          : id === 0
+            ? api.clearCart()
+            : api.removeItem(id)),
+      );
     } catch (err) {
       setActionError(err);
     } finally {
@@ -85,34 +92,40 @@ export function Cart() {
                     +
                   </button>
                 </div>
+                <button
+                  className="secondary"
+                  disabled={busy !== null}
+                  onClick={() => change(item.id)}
+                  aria-label={`Remove ${item.name} from basket`}
+                >
+                  Remove
+                </button>
                 <strong>{money(item.line_total)}</strong>
               </article>
             ))}
           </div>
           <p className="subtle-note">
-            Quantities can be changed from 1 to 99. Item removal is not
-            available yet. Your basket stays with one restaurant until you place
-            an order.
+            Quantities can be changed from 1 to 99. Removing basket items does
+            not change placed orders.
           </p>
+          <button
+            className="secondary"
+            disabled={busy !== null}
+            onClick={() => change(0)}
+          >
+            Clear basket
+          </button>
           <Link className="back-link" to={`/restaurants/${cart.restaurant_id}`}>
             ← Back to the menu
           </Link>
         </div>
         <aside className="panel order-summary">
           <h2>Basket summary</h2>
-          <dl className="totals">
-            <div className="grand-total">
-              <dt>Subtotal</dt>
-              <dd>{money(cart.subtotal)}</dd>
-            </div>
-          </dl>
-          <p className="muted">
-            Delivery and final totals are shown at checkout.
-          </p>
+          <BasketTotals cart={cart} />
           {blocked ? (
             <p className="notice">
               Checkout is unavailable while your basket contains unavailable
-              items. Item removal is not supported yet.
+              items. Remove unavailable items to continue.
             </p>
           ) : busy !== null ? (
             <button disabled>Updating basket…</button>

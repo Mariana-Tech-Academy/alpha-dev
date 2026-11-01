@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"alpha-dev/models"
+	"alpha-dev/pricing"
 	"alpha-dev/repository"
 
 	"gorm.io/gorm"
@@ -15,12 +16,11 @@ type CheckoutService interface {
 }
 
 type checkoutService struct {
-	cartRepo    repository.CartRepository
-	deliveryFee int64
+	cartRepo repository.CartRepository
 }
 
-func NewCheckoutService(cartRepo repository.CartRepository, deliveryFee int64) CheckoutService {
-	return &checkoutService{cartRepo: cartRepo, deliveryFee: deliveryFee}
+func NewCheckoutService(cartRepo repository.CartRepository) CheckoutService {
+	return &checkoutService{cartRepo: cartRepo}
 }
 
 func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.CheckoutSummary, error) {
@@ -47,8 +47,7 @@ func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.Che
 			ID:   cart.Restaurant.ID,
 			Name: cart.Restaurant.Name,
 		},
-		Items:       make([]models.CheckoutItem, 0, len(cart.Items)),
-		DeliveryFee: s.deliveryFee,
+		Items: make([]models.CheckoutItem, 0, len(cart.Items)),
 	}
 	for _, item := range cart.Items {
 		if item.MenuItem.ID == 0 || !item.MenuItem.Available || item.MenuItem.RestaurantID != *cart.RestaurantID {
@@ -64,6 +63,8 @@ func (s *checkoutService) Summary(ctx context.Context, userID uint) (*models.Che
 		})
 		summary.Subtotal += lineTotal
 	}
-	summary.Total = summary.Subtotal + summary.DeliveryFee
+	totals := pricing.Calculate(summary.Subtotal, true)
+	summary.DeliveryFee = totals.DeliveryFee
+	summary.Total = totals.Total
 	return summary, nil
 }

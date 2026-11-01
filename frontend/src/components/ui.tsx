@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
+import { imageCandidates } from "../utils/images";
 import { money, statusLabel } from "../utils/format";
 export function Loading({
   label = "Loading your next good meal…",
@@ -66,24 +67,36 @@ export function FoodImage({
   name: string;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const resolved = imageCandidates(src).find(
+    (candidate) => !failedSources.includes(candidate),
+  );
+  const photo = resolved?.includes("/demo-images/photos/");
   return (
     <div className={`food-image ${className}`}>
-      {src && !failed ? (
+      {resolved ? (
         <img
-          src={src}
-          alt={name}
+          src={resolved}
+          alt={photo ? `${name} — representative stock photograph` : name}
           loading="lazy"
-          onError={() => setFailed(true)}
+          decoding="async"
+          width={480}
+          height={360}
+          onError={() =>
+            setFailedSources((previous) => [...previous, resolved])
+          }
         />
       ) : (
         <div
           className="image-placeholder"
+          role="img"
           aria-label={`${name}: image unavailable`}
         >
-          <span aria-hidden="true">♨</span>
-          <small>Good food awaits</small>
+          <small>Photo unavailable</small>
         </div>
+      )}
+      {resolved && photo && (
+        <span className="illustration-label">Serving suggestion</span>
       )}
     </div>
   );

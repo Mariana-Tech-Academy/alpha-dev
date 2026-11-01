@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { hasRestaurantPhoto } from "../utils/images";
 import { api } from "../api/foodhub";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, FoodImage, Loading } from "../components/ui";
@@ -13,6 +14,9 @@ export function Restaurants() {
     [query, page],
   );
   const { data, error, loading, retry } = useResource(load);
+  const restaurants = data?.filter((restaurant) =>
+    hasRestaurantPhoto(restaurant.image_url),
+  );
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const q = String(new FormData(event.currentTarget).get("q") || "").trim();
@@ -48,31 +52,11 @@ export function Restaurants() {
             </button>
           </form>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <div className="plate">
-            <div className="salad">
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <b />
-              <b />
-              <b />
-              <b />
-            </div>
-          </div>
-          <span className="art-note">
-            Made for your
-            <br />
-            <strong>good food mood.</strong>
-          </span>
-          <span className="spark">✳</span>
+        <div className="hero-art hero-photograph">
+          <FoodImage
+            src="/demo-images/photos/hero/sushi-platter.jpg"
+            name="Colourful sushi platter"
+          />
         </div>
       </section>
       <section className="section">
@@ -89,7 +73,7 @@ export function Restaurants() {
           <Loading />
         ) : error ? (
           <ErrorMessage error={error} retry={retry} />
-        ) : !data?.length ? (
+        ) : !restaurants?.length ? (
           <Empty
             title={query ? "No restaurants found" : "The kitchens are quiet"}
           >
@@ -106,7 +90,7 @@ export function Restaurants() {
           </Empty>
         ) : (
           <div className="restaurant-grid">
-            {data.map((restaurant) => (
+            {restaurants.map((restaurant) => (
               <Link
                 className="restaurant-card"
                 key={restaurant.id}

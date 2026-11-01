@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"alpha-dev/models"
+	"alpha-dev/pricing"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -105,9 +106,10 @@ func (r *PostgresOrderRepo) PlaceOrder(ctx context.Context, userID uint, order *
 		order.CustomerID = userID
 		order.RestaurantID = *cart.RestaurantID
 		order.Status = models.OrderStatusPending
-		order.DeliveryFee = 0
-		order.Subtotal = subtotal
-		order.Total = subtotal
+		totals := pricing.Calculate(subtotal, true)
+		order.DeliveryFee = totals.DeliveryFee
+		order.Subtotal = totals.Subtotal
+		order.Total = totals.Total
 		order.Items = orderItems
 
 		if err := tx.Create(order).Error; err != nil {
@@ -142,6 +144,7 @@ func (r *PostgresOrderRepo) FindCustomerOrders(ctx context.Context, customerID u
 	orders := make([]models.Order, 0)
 	err = r.db.WithContext(ctx).
 		Preload("Restaurant").
+		Preload("Items", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
 		Where("customer_id = ?", customerID).
 		Order("created_at DESC, id DESC").
 		Limit(limit).

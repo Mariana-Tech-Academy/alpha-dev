@@ -59,6 +59,9 @@ export interface CartItem {
   notice?: string;
 }
 export interface Cart {
+  // Optional while an existing backend is awaiting its approved restart.
+  delivery_fee?: number;
+  total?: number;
   cart_id: number;
   restaurant_id?: number;
   items: CartItem[];
@@ -107,6 +110,15 @@ export interface OrderHistory {
     order_number: string;
     restaurant_id: number;
     restaurant_name: string;
+    items: OrderLine[];
+    subtotal: number;
+    delivery_fee: number;
+    delivery_name?: string;
+    delivery_phone?: string;
+    delivery_address?: string;
+    delivery_city?: string;
+    delivery_state?: string;
+    delivery_instructions?: string;
     total: number;
     status: OrderStatus;
     created_at: string;

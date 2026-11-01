@@ -170,8 +170,8 @@ func TestOrderSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to place test order: %v", err)
 	}
-	if placedOrder.Subtotal != 1700 || placedOrder.DeliveryFee != 0 || placedOrder.Total != 1700 {
-		t.Fatalf("expected subtotal 1700, fee 0, total 1700; got %d, %d, %d", placedOrder.Subtotal, placedOrder.DeliveryFee, placedOrder.Total)
+	if placedOrder.Subtotal != 1700 || placedOrder.DeliveryFee != 299 || placedOrder.Total != 1999 {
+		t.Fatalf("expected subtotal 1700, fee 299, total 1999; got %d, %d, %d", placedOrder.Subtotal, placedOrder.DeliveryFee, placedOrder.Total)
 	}
 
 	if err := db.Model(&customer).Updates(map[string]any{
@@ -187,7 +187,7 @@ func TestOrderSnapshot(t *testing.T) {
 		t.Fatalf("delivery snapshot changed after profile update: %+v", saved)
 	}
 	assertSnapshotItem(t, saved, "Chicken Burger", 850, 2, 1700)
-	if saved.Total != 1700 {
+	if saved.Total != 1999 {
 		t.Fatalf("order total changed after profile update: %d", saved.Total)
 	}
 
@@ -199,7 +199,7 @@ func TestOrderSnapshot(t *testing.T) {
 	}
 	saved = reloadOrder(t, db, placedOrder.ID)
 	assertSnapshotItem(t, saved, "Chicken Burger", 850, 2, 1700)
-	if saved.Total != 1700 {
+	if saved.Total != 1999 {
 		t.Fatalf("order total changed after menu update: %d", saved.Total)
 	}
 
@@ -213,7 +213,7 @@ func TestOrderSnapshot(t *testing.T) {
 	}
 	saved = reloadOrder(t, db, placedOrder.ID)
 	assertSnapshotItem(t, saved, "Chicken Burger", 850, 2, 1700)
-	if saved.Total != 1700 || saved.DeliveryFee != 0 {
+	if saved.Total != 1999 || saved.DeliveryFee != 299 {
 		t.Fatalf("order totals changed after menu deletion: fee %d total %d", saved.DeliveryFee, saved.Total)
 	}
 }

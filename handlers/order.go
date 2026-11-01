@@ -102,10 +102,17 @@ func (h *OrderHandler) GetOrderHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 type UpdateOrderStatusRequest struct {
-	Status models.OrderStatus `json:"status"`
+	Status         models.OrderStatus `json:"status,omitempty"`
+	ExpectedStatus models.OrderStatus `json:"expected_status,omitempty"`
 }
 
 func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	h.updateStatus(w, r, false)
+}
+func (h *OrderHandler) AdvanceDemoOrder(w http.ResponseWriter, r *http.Request) {
+	h.updateStatus(w, r, true)
+}
+func (h *OrderHandler) updateStatus(w http.ResponseWriter, r *http.Request, demo bool) {
 	claims, err := auth.ClaimsFromContext(r.Context())
 	if err != nil {
 		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
@@ -131,7 +138,16 @@ func (h *OrderHandler) UpdateOrderStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	order, err := h.OrderService.UpdateOrderStatus(r.Context(), claims.UserID, claims.Role, uint(id), req.Status)
+	if (demo && (req.Status != "" || req.ExpectedStatus == "")) || (!demo && req.ExpectedStatus != "") {
+		utils.Error(w, http.StatusBadRequest, "invalid status JSON")
+		return
+	}
+	var order service.UpdatedOrder
+	if demo {
+		order, err = h.OrderService.AdvanceDemoOrder(r.Context(), claims.UserID, claims.Role, uint(id), req.ExpectedStatus)
+	} else {
+		order, err = h.OrderService.UpdateOrderStatus(r.Context(), claims.UserID, claims.Role, uint(id), req.Status)
+	}
 	if err != nil {
 		var transitionErr *service.OrderTransitionError
 		switch {

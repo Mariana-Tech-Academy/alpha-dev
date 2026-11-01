@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"alpha-dev/models"
+	"alpha-dev/pricing"
 	"alpha-dev/repository"
 
 	"gorm.io/gorm"
@@ -24,6 +25,7 @@ var (
 )
 
 type CartService interface {
+	RemoveItems(ctx context.Context, userID uint, itemID *uint) (*models.CartViewResponse, error)
 	AddItem(ctx context.Context, userID uint, menuItemID uint, quantity int) (*models.CartItem, error)
 	GetCartView(ctx context.Context, userID uint) (*models.CartViewResponse, error)
 	UpdateQuantity(ctx context.Context, userID uint, itemID uint, quantity int) (*models.CartViewResponse, error)
@@ -156,11 +158,14 @@ func (s *cartService) GetCartView(ctx context.Context, userID uint) (*models.Car
 		items = append(items, row)
 	}
 
+	totals := pricing.Calculate(subtotal, len(items) > 0)
 	return &models.CartViewResponse{
 		CartID:       cart.ID,
 		RestaurantID: cart.RestaurantID,
 		Items:        items,
-		Subtotal:     subtotal,
+		Subtotal:     totals.Subtotal,
+		DeliveryFee:  totals.DeliveryFee,
+		Total:        totals.Total,
 	}, nil
 }
 
@@ -194,5 +199,22 @@ func (s *cartService) UpdateQuantity(
 	}
 
 	// Reuse the existing calculation for the new totals.
+	return s.GetCartView(ctx, userID)
+}
+
+func (s *cartService) RemoveItems(ctx context.Context, userID uint, itemID *uint) (*models.CartViewResponse, error) {
+	if userID == 0 {
+		return nil, ErrInvalidUser
+	}
+	if itemID != nil && *itemID == 0 {
+		return nil, ErrCartItemNotFound
+	}
+	err := s.cartRepo.RemoveItems(ctx, userID, itemID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCartItemNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
 	return s.GetCartView(ctx, userID)
 }

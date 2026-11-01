@@ -1,7 +1,7 @@
 import { test, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import { request, session, ApiError } from "../src/api/client.ts";
-import { money } from "../src/utils/format.ts";
+import { money, statusLabel } from "../src/utils/format.ts";
 const originalFetch = globalThis.fetch;
 let storage;
 let events;
@@ -116,5 +116,67 @@ test("network errors are actionable and aborts remain aborts", async () => {
 });
 test("GBP uses minor units, including zero delivery", () => {
   assert.equal(money(1250), "£12.50");
+  assert.equal(money(299), "£2.99");
   assert.equal(money(0), "£0.00");
+});
+
+test("basket API removes cart-line IDs and clears only the authenticated basket", async () => {
+  const { api } = await import("../src/api/foodhub.ts");
+  session.set("customer-token");
+  const calls = [];
+  const empty = { cart_id: 4, items: [], subtotal: 0 };
+  globalThis.fetch = async (url, options) => {
+    calls.push([url, options.method]);
+    assert.equal(options.headers.get("Authorization"), "Bearer customer-token");
+    assert.equal(options.body, undefined);
+    return Response.json({ success: true, data: empty });
+  };
+  assert.deepEqual(await api.removeItem(11), empty);
+  assert.deepEqual(await api.clearCart(), empty);
+  assert.deepEqual(calls, [
+    ["http://localhost:8080/api/cart/items/11", "DELETE"],
+    ["http://localhost:8080/api/cart", "DELETE"],
+  ]);
+});
+
+test("order status labels preserve the customer lifecycle and unknown-status fallback", () => {
+  const labels = {
+    pending: "Pending",
+    confirmed: "Pending",
+    preparing: "In Progress",
+    ready_for_delivery: "In Progress",
+    out_for_delivery: "Out for Delivery",
+    delivered: "Complete",
+    cancelled: "Cancelled",
+  };
+  for (const [status, label] of Object.entries(labels)) {
+    assert.equal(statusLabel(status), label);
+  }
+  assert.equal(statusLabel("awaiting_collection"), "awaiting collection");
+});
+
+test("expired separate demo staff token never clears the customer's session", async () => {
+  session.set("customer-token");
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "http://localhost:8080/api/demo/orders/9/advance");
+    assert.equal(
+      options.headers.get("Authorization"),
+      "Bearer expired-staff-token",
+    );
+    assert.deepEqual(JSON.parse(options.body), { expected_status: "pending" });
+    return Response.json(
+      { success: false, message: "invalid or expired token" },
+      { status: 401 },
+    );
+  };
+  await assert.rejects(
+    request("/demo/orders/9/advance", {
+      method: "POST",
+      headers: { Authorization: "Bearer expired-staff-token" },
+      body: JSON.stringify({ expected_status: "pending" }),
+    }),
+    (error) => error.status === 401,
+  );
+  assert.equal(session.get(), "customer-token");
+  assert.deepEqual(events, []);
 });
