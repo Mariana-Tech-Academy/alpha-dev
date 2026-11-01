@@ -174,6 +174,7 @@ func TestUpdateCartQuantity(t *testing.T) {
 	restaurantID := uint(3)
 	item := cartLine(9, "Pizza", 2, 1000, restaurantID)
 	item.ID = 7
+	item.MenuItem.Price = 1000
 
 	cart := &models.Cart{
 		UserID:       4,
@@ -194,26 +195,32 @@ func TestUpdateCartQuantity(t *testing.T) {
 		row := view.Items[0]
 		expected := int64(quantity) * 1000
 		if row.ID != 7 || row.Quantity != quantity ||
-			row.LockedPrice != 1000 ||
+			row.Price != 1000 || row.LockedPrice != 1000 || row.PriceChanged ||
 			row.LineTotal != expected || view.Subtotal != expected {
 			t.Fatalf("unexpected cart: %+v", view)
 		}
 	}
 
 	// Invalid quantities must not change the saved quantity.
-	for _, quantity := range []int{0, -1, 100} {
+	for _, quantity := range []int{0, -1} {
 		_, err := svc.UpdateQuantity(context.Background(), 4, 7, quantity)
-		if !errors.Is(err, ErrInvalidQuantity) &&
-			!errors.Is(err, ErrCartQuantityLimit) {
-			t.Fatalf("expected quantity error, got %v", err)
+		if !errors.Is(err, ErrInvalidQuantity) {
+			t.Fatalf("expected invalid quantity, got %v", err)
 		}
 		if cart.Items[0].Quantity != 1 {
 			t.Fatal("invalid request changed the quantity")
 		}
 	}
+	_, err := svc.UpdateQuantity(context.Background(), 4, 7, 100)
+	if !errors.Is(err, ErrCartQuantityLimit) {
+		t.Fatalf("expected quantity limit, got %v", err)
+	}
+	if cart.Items[0].Quantity != 1 {
+		t.Fatal("invalid request changed the quantity")
+	}
 
 	// Another customer cannot change this cart.
-	_, err := svc.UpdateQuantity(context.Background(), 8, 7, 5)
+	_, err = svc.UpdateQuantity(context.Background(), 8, 7, 5)
 	if !errors.Is(err, ErrCartItemNotFound) {
 		t.Fatalf("expected item not found, got %v", err)
 	}

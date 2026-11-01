@@ -124,21 +124,18 @@ func (h *CartHandler) GetCart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CartHandler) UpdateQuantity(w http.ResponseWriter, r *http.Request) {
-	// Identify the logged-in customer.
 	claims, err := auth.ClaimsFromContext(r.Context())
 	if err != nil {
 		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
 
-	// Read the cart item ID from the URL.
-	itemID, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 32)
+	itemID, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 64)
 	if err != nil || itemID == 0 {
 		utils.Error(w, http.StatusBadRequest, "invalid cart item ID")
 		return
 	}
 
-	// Read one JSON object containing the quantity.
 	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
 	var req UpdateCartQuantityRequest
 	decoder := json.NewDecoder(r.Body)
