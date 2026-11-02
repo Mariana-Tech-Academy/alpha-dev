@@ -31,10 +31,10 @@ from instructions for a new environment.
 
 Prices are positive integer GBP pence. Addresses, sample telephone numbers and
 `.example.test` emails are fictional. The backend catalogue has 48 available dishes;
-41 have approved photo paths and seven have blank image paths. The frontend hides
-those seven dishes from customer menus. All six covers have photographs. Explore
-and search require qualifying configured covers; historical orders remain visible
-regardless of a restaurant's current cover.
+41 have approved photo paths and seven have blank image paths. The frontend lists
+those seven dishes with a neutral placeholder. All six covers have photographs.
+Explore and search list every restaurant the API returns; historical orders remain
+visible regardless of a restaurant's current cover.
 
 The asset manifest has 42 unique Pexels sources across 48 photo slots: six covers,
 41 menu dishes and the homepage hero. The original 45 CC0 PNGs and editable SVGs

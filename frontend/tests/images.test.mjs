@@ -142,7 +142,7 @@ test("cards display only photographs; legacy art and missing photos use neutral 
   );
 });
 
-test("customer menus retain 41 photo dishes and exclude seven blanks without changing data", async () => {
+test("photo detection marks 41 dishes and leaves seven blanks for a placeholder", async () => {
   const { hasMenuPhoto } = await import("../src/utils/images.ts");
   const dishes = catalog.flatMap((restaurant) => restaurant.items);
   assert.equal(
@@ -163,7 +163,7 @@ test("customer menus retain 41 photo dishes and exclude seven blanks without cha
   assert.equal(hasMenuPhoto("/demo-images/menu/unapproved.png"), false);
 });
 
-test("Explore/search keep all six photo covers and hide missing or placeholder covers", async () => {
+test("cover detection accepts the six photographs and rejects missing or placeholder covers", async () => {
   const { hasRestaurantPhoto } = await import("../src/utils/images.ts");
   assert.equal(
     catalog.filter((r) => hasRestaurantPhoto(r.image_url)).length,

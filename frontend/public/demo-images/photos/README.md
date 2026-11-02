@@ -3,7 +3,8 @@
 The current manifest contains 42 unique Pexels source photographs across 48 photo
 slots: six restaurant covers, 41 menu dishes and the homepage sushi hero. Seven
 additional menu slots have no approved photograph. Their backend catalogue image
-paths are blank and the customer menus hide them. Original CC0 artwork remains
+paths are blank, and those dishes stay on the menu with a neutral placeholder.
+Original CC0 artwork remains
 archived; customer cards do not use it as a fallback. A configured image that fails
 to load shows a neutral “Photo unavailable” placeholder without hiding its card.
 

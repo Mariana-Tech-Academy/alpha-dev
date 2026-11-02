@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { hasRestaurantPhoto } from "../utils/images";
 import { api } from "../api/foodhub";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, FoodImage, Loading } from "../components/ui";
@@ -14,9 +13,6 @@ export function Restaurants() {
     [query, page],
   );
   const { data, error, loading, retry } = useResource(load);
-  const restaurants = data?.filter((restaurant) =>
-    hasRestaurantPhoto(restaurant.image_url),
-  );
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const q = String(new FormData(event.currentTarget).get("q") || "").trim();
@@ -73,7 +69,7 @@ export function Restaurants() {
           <Loading />
         ) : error ? (
           <ErrorMessage error={error} retry={retry} />
-        ) : !restaurants?.length ? (
+        ) : !data?.length ? (
           <Empty
             title={query ? "No restaurants found" : "The kitchens are quiet"}
           >
@@ -90,7 +86,7 @@ export function Restaurants() {
           </Empty>
         ) : (
           <div className="restaurant-grid">
-            {restaurants.map((restaurant) => (
+            {data.map((restaurant) => (
               <Link
                 className="restaurant-card"
                 key={restaurant.id}

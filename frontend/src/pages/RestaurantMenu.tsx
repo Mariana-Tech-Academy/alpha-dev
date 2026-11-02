@@ -4,7 +4,6 @@ import { api } from "../api/foodhub";
 import { useAuth } from "../auth/context";
 import { useResource } from "../hooks/useResource";
 import { Empty, ErrorMessage, FoodImage, Loading } from "../components/ui";
-import { hasMenuPhoto } from "../utils/images";
 import { money } from "../utils/format";
 export function RestaurantMenu() {
   const { id = "" } = useParams();
@@ -38,9 +37,7 @@ export function RestaurantMenu() {
   }
   if (loading) return <Loading label="Loading the menu…" />;
   if (error || !data) return <ErrorMessage error={error} retry={retry} />;
-  const menuItems = data.menu_items.filter((item) =>
-    hasMenuPhoto(item.image_url),
-  );
+  const menuItems = data.menu_items;
   const categories = [
     "All",
     ...new Set(menuItems.map((item) => item.category).filter(Boolean)),
