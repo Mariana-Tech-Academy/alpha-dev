@@ -11,6 +11,7 @@ import (
 )
 
 type CartRepository interface {
+	RemoveItems(ctx context.Context, userID uint, itemID *uint) error
 	AddItem(
 		ctx context.Context,
 		userID uint,
@@ -180,5 +181,38 @@ func (r *PostgresCartRepo) UpdateQuantity(
 
 		// Keep the saved price and change only the quantity.
 		return tx.Model(&item).Update("quantity", quantity).Error
+	})
+}
+
+// Remove only active lines in this customer's locked cart. nil means clear all.
+func (r *PostgresCartRepo) RemoveItems(ctx context.Context, userID uint, itemID *uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var cart models.Cart
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", userID).First(&cart).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) && itemID == nil {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		lines := tx.Where("cart_id = ?", cart.ID)
+		if itemID != nil {
+			lines = lines.Where("id = ?", *itemID)
+		}
+		result := lines.Delete(&models.CartItem{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if itemID != nil && result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		var remaining int64
+		if err := tx.Model(&models.CartItem{}).Where("cart_id = ?", cart.ID).Count(&remaining).Error; err != nil {
+			return err
+		}
+		if remaining == 0 {
+			return tx.Model(&cart).Update("restaurant_id", nil).Error
+		}
+		return nil
 	})
 }

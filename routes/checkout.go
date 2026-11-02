@@ -16,7 +16,7 @@ import (
 
 func CheckoutRoutes(router *mux.Router, db *gorm.DB, tokens *auth.JWTManager) {
 	cartRepo := repository.NewCartRepository(db)
-	checkoutService := service.NewCheckoutService(cartRepo, 0)
+	checkoutService := service.NewCheckoutService(cartRepo)
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutService)
 
 	customer := protected(router, tokens)

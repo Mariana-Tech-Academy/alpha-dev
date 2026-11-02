@@ -1,0 +1,518 @@
+[
+  {
+    "key": "burger-district",
+    "name": "Burger District",
+    "description": "Smashed beef burgers, crispy chicken and generously loaded fries, made fresh to order.",
+    "address": "10 Foundry Lane (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960101",
+    "opening_time": "11:00",
+    "closing_time": "23:00",
+    "items": [
+      {
+        "key": "classic-smash",
+        "name": "Classic Smash Burger",
+        "category": "Burgers",
+        "description": "Two smashed beef patties, melted cheddar, pickles and house burger sauce in a toasted bun.",
+        "price": 895,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/classic-smash.jpg"
+      },
+      {
+        "key": "smoky-bbq",
+        "name": "Smoky BBQ Bacon Burger",
+        "category": "Burgers",
+        "description": "Beef patty, smoked bacon, cheddar and crispy onions with a smoky barbecue glaze.",
+        "price": 1095,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/smoky-bbq.jpg"
+      },
+      {
+        "key": "crispy-chicken",
+        "name": "Buttermilk Chicken Burger",
+        "category": "Burgers",
+        "description": "Crispy buttermilk chicken breast with crunchy slaw and garlic mayonnaise.",
+        "price": 945,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/crispy-chicken.jpg"
+      },
+      {
+        "key": "plant-burger",
+        "name": "Garden Bean Burger",
+        "category": "Burgers",
+        "description": "Spiced bean and vegetable patty with lettuce, tomato and lemon tahini dressing.",
+        "price": 825,
+        "available": true,
+        "image_url": ""
+      },
+      {
+        "key": "skin-on-fries",
+        "name": "Sea Salt Skin-on Fries",
+        "category": "Sides",
+        "description": "Golden skin-on fries finished with sea salt and a touch of rosemary.",
+        "price": 325,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/skin-on-fries.jpg"
+      },
+      {
+        "key": "loaded-fries",
+        "name": "Loaded Cheese Fries",
+        "category": "Sides",
+        "description": "Skin-on fries topped with warm cheese sauce, spring onions and crispy onion pieces.",
+        "price": 495,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/loaded-fries.jpg"
+      },
+      {
+        "key": "buffalo-wings",
+        "name": "Buffalo Wings (6 pieces)",
+        "category": "Wings",
+        "description": "Six crispy chicken wings tossed in tangy buffalo sauce, with a ranch-style dip.",
+        "price": 695,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/buffalo-wings.jpg"
+      },
+      {
+        "key": "bbq-wings",
+        "name": "Sticky BBQ Wings (6 pieces)",
+        "category": "Wings",
+        "description": "Six chicken wings coated in a sweet, smoky barbecue glaze with sesame seeds.",
+        "price": 695,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/burger-district/bbq-wings.jpg"
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/burger-district.jpg"
+  },
+  {
+    "key": "bella-italia-kitchen",
+    "name": "Bella Italia Kitchen",
+    "description": "Comforting Italian favourites: stone-baked pizzas, rich pasta sauces and freshly prepared sides.",
+    "address": "22 Olive Court (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960102",
+    "opening_time": "12:00",
+    "closing_time": "22:30",
+    "items": [
+      {
+        "key": "margherita",
+        "name": "Margherita Pizza (12 inch)",
+        "category": "Pizzas",
+        "description": "Stone-baked pizza with tomato sauce, creamy mozzarella, fresh basil and olive oil.",
+        "price": 995,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/margherita.jpg"
+      },
+      {
+        "key": "pepperoni",
+        "name": "Pepperoni Pizza (12 inch)",
+        "category": "Pizzas",
+        "description": "Tomato and mozzarella pizza topped with pepperoni and a pinch of oregano.",
+        "price": 1195,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/pepperoni.jpg"
+      },
+      {
+        "key": "roast-veg",
+        "name": "Roasted Vegetable Pizza (12 inch)",
+        "category": "Pizzas",
+        "description": "Courgette, peppers, red onion and mushrooms on a tomato and mozzarella base.",
+        "price": 1125,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/roast-veg.jpg"
+      },
+      {
+        "key": "bolognese",
+        "name": "Spaghetti Bolognese",
+        "category": "Pasta",
+        "description": "Spaghetti in a slow-simmered beef and tomato ragù, finished with hard Italian cheese.",
+        "price": 1095,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/bolognese.jpg"
+      },
+      {
+        "key": "alfredo",
+        "name": "Chicken Mushroom Tagliatelle",
+        "category": "Pasta",
+        "description": "Tagliatelle with grilled chicken and chestnut mushrooms in a creamy garlic sauce.",
+        "price": 1245,
+        "available": true,
+        "image_url": ""
+      },
+      {
+        "key": "arrabbiata",
+        "name": "Penne Arrabbiata",
+        "category": "Pasta",
+        "description": "Penne in a lively tomato sauce with garlic, chilli and flat-leaf parsley.",
+        "price": 945,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/arrabbiata.jpg"
+      },
+      {
+        "key": "garlic-bread",
+        "name": "Cheesy Garlic Bread",
+        "category": "Sides",
+        "description": "Toasted bread spread with garlic butter and baked with mozzarella.",
+        "price": 425,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/garlic-bread.jpg"
+      },
+      {
+        "key": "lasagne",
+        "name": "Classic Beef Lasagne",
+        "category": "Pasta",
+        "description": "Layers of pasta, beef ragù and creamy béchamel beneath a golden cheese topping.",
+        "price": 1195,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/bella-italia-kitchen/lasagne.jpg"
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/bella-italia-kitchen.jpg"
+  },
+  {
+    "key": "spice-route",
+    "name": "Spice Route",
+    "description": "Aromatic biryanis, warming curries and soft naan inspired by the flavours of South Asia.",
+    "address": "35 Saffron Walk (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960103",
+    "opening_time": "12:00",
+    "closing_time": "23:00",
+    "items": [
+      {
+        "key": "chicken-biryani",
+        "name": "Chicken Dum Biryani",
+        "category": "Biryani",
+        "description": "Fragrant basmati rice layered with spiced chicken, caramelised onions and fresh herbs; served with raita.",
+        "price": 1195,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/chicken-biryani.jpg"
+      },
+      {
+        "key": "vegetable-biryani",
+        "name": "Vegetable Biryani",
+        "category": "Biryani",
+        "description": "Basmati rice with seasonal vegetables, warming whole spices and mint; served with raita.",
+        "price": 995,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/vegetable-biryani.jpg"
+      },
+      {
+        "key": "butter-chicken",
+        "name": "Butter Chicken",
+        "category": "Curries",
+        "description": "Tender chicken in a mellow tomato, cream and butter sauce. Rice sold separately.",
+        "price": 1095,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/butter-chicken.jpg"
+      },
+      {
+        "key": "chana-masala",
+        "name": "Chana Masala",
+        "category": "Curries",
+        "description": "Chickpeas simmered with tomatoes, ginger and toasted spices. Rice sold separately.",
+        "price": 845,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/chana-masala.jpg"
+      },
+      {
+        "key": "palak-paneer",
+        "name": "Palak Paneer",
+        "category": "Curries",
+        "description": "Cubes of paneer in a silky spinach sauce with garlic and a gentle touch of chilli.",
+        "price": 945,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/palak-paneer.jpg"
+      },
+      {
+        "key": "garlic-naan",
+        "name": "Garlic and Coriander Naan",
+        "category": "Breads",
+        "description": "Soft naan brushed with garlic butter and scattered with fresh coriander.",
+        "price": 295,
+        "available": true,
+        "image_url": ""
+      },
+      {
+        "key": "pilau-rice",
+        "name": "Basmati Pilau Rice",
+        "category": "Sides",
+        "description": "Fluffy basmati rice gently scented with cumin, cardamom and bay leaf.",
+        "price": 325,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/spice-route/pilau-rice.jpg"
+      },
+      {
+        "key": "lamb-rogan-josh",
+        "name": "Lamb Rogan Josh",
+        "category": "Curries",
+        "description": "Slow-cooked lamb in a rich tomato and onion sauce with Kashmiri-style spices.",
+        "price": 1295,
+        "available": true,
+        "image_url": ""
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/spice-route.jpg"
+  },
+  {
+    "key": "shawarma-house",
+    "name": "The Shawarma House",
+    "description": "Freshly wrapped shawarma, crisp falafel and charcoal-style grills with bright salads and house sauces.",
+    "address": "48 Cedar Mews (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960104",
+    "opening_time": "11:30",
+    "closing_time": "23:00",
+    "items": [
+      {
+        "key": "chicken-wrap",
+        "name": "Chicken Shawarma Wrap",
+        "category": "Wraps",
+        "description": "Spiced sliced chicken in warm flatbread with pickles, shredded salad and garlic sauce.",
+        "price": 795,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/shawarma-house/chicken-wrap.jpg"
+      },
+      {
+        "key": "lamb-wrap",
+        "name": "Lamb Shawarma Wrap",
+        "category": "Wraps",
+        "description": "Tender lamb shawarma with tomato, pickles, red onion and tahini sauce in flatbread.",
+        "price": 895,
+        "available": true,
+        "image_url": ""
+      },
+      {
+        "key": "falafel-wrap",
+        "name": "Falafel and Hummus Wrap",
+        "category": "Wraps",
+        "description": "Crisp chickpea falafel, creamy hummus, crunchy salad and lemon tahini in warm flatbread.",
+        "price": 695,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/shawarma-house/falafel-wrap.jpg"
+      },
+      {
+        "key": "chicken-platter",
+        "name": "Chicken Shawarma Rice Platter",
+        "category": "Grills",
+        "description": "Spiced chicken shawarma over seasoned rice with salad, pickles and garlic sauce.",
+        "price": 1195,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/shawarma-house/chicken-platter.jpg"
+      },
+      {
+        "key": "kofta",
+        "name": "Lamb Kofta Grill",
+        "category": "Grills",
+        "description": "Two grilled lamb kofta skewers with flatbread, chopped salad and a yoghurt dip.",
+        "price": 1245,
+        "available": true,
+        "image_url": ""
+      },
+      {
+        "key": "hummus",
+        "name": "Hummus and Flatbread",
+        "category": "Sides",
+        "description": "Smooth chickpea hummus with olive oil and paprika, served with warm flatbread.",
+        "price": 395,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/shawarma-house/hummus.jpg"
+      },
+      {
+        "key": "falafel-box",
+        "name": "Falafel Bites (5 pieces)",
+        "category": "Sides",
+        "description": "Five freshly fried chickpea and herb falafel bites with a tahini dipping sauce.",
+        "price": 445,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/shawarma-house/falafel-box.jpg"
+      },
+      {
+        "key": "mixed-grill",
+        "name": "House Mixed Grill",
+        "category": "Grills",
+        "description": "Chicken skewer, lamb kofta and shawarma with rice, flatbread and house salad.",
+        "price": 1595,
+        "available": true,
+        "image_url": ""
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/shawarma-house.jpg"
+  },
+  {
+    "key": "sweet-treats-cafe",
+    "name": "Sweet Treats Café",
+    "description": "Warm Belgian-style waffles, generous slices of cake and thick hand-blended milkshakes.",
+    "address": "60 Maple Yard (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960105",
+    "opening_time": "10:00",
+    "closing_time": "22:00",
+    "items": [
+      {
+        "key": "strawberry-waffle",
+        "name": "Strawberry Chocolate Waffle",
+        "category": "Waffles",
+        "description": "Warm Belgian-style waffle with sliced strawberries, milk chocolate sauce and vanilla ice cream.",
+        "price": 745,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/strawberry-waffle.jpg"
+      },
+      {
+        "key": "banoffee-waffle",
+        "name": "Banoffee Waffle",
+        "category": "Waffles",
+        "description": "Golden waffle topped with banana, toffee sauce, biscuit crumbs and vanilla ice cream.",
+        "price": 725,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/banoffee-waffle.jpg"
+      },
+      {
+        "key": "brownie",
+        "name": "Warm Chocolate Brownie",
+        "category": "Cakes",
+        "description": "Rich chocolate brownie served warm with a scoop of vanilla ice cream.",
+        "price": 495,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/brownie.jpg"
+      },
+      {
+        "key": "cheesecake",
+        "name": "Strawberry Cheesecake Slice",
+        "category": "Cakes",
+        "description": "Creamy baked cheesecake on a biscuit base, finished with strawberry compote.",
+        "price": 525,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/cheesecake.jpg"
+      },
+      {
+        "key": "chocolate-cake",
+        "name": "Chocolate Fudge Cake Slice",
+        "category": "Cakes",
+        "description": "Soft chocolate sponge layered with smooth chocolate fudge frosting.",
+        "price": 495,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/chocolate-cake.jpg"
+      },
+      {
+        "key": "vanilla-shake",
+        "name": "Vanilla Milkshake",
+        "category": "Milkshakes",
+        "description": "Thick vanilla ice cream milkshake blended with milk and topped with whipped cream.",
+        "price": 445,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/vanilla-shake.jpg"
+      },
+      {
+        "key": "cookie-shake",
+        "name": "Cookies and Cream Milkshake",
+        "category": "Milkshakes",
+        "description": "Vanilla ice cream blended with chocolate sandwich biscuits and topped with whipped cream.",
+        "price": 525,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/cookie-shake.jpg"
+      },
+      {
+        "key": "red-velvet",
+        "name": "Red Velvet Cake Slice",
+        "category": "Cakes",
+        "description": "A slice of cocoa-red sponge with a generous layer of cream cheese frosting.",
+        "price": 545,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/sweet-treats-cafe/red-velvet.jpg"
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/sweet-treats-cafe.jpg"
+  },
+  {
+    "key": "tokyo-bento-kitchen",
+    "name": "Tokyo Bento Kitchen",
+    "description": "Japanese-inspired comfort food, fresh sushi rolls and warming noodle bowls, prepared to order.",
+    "address": "60 Sakura Lane (fictional demo address)",
+    "city": "London",
+    "state": "Greater London",
+    "phone": "01632 960106",
+    "opening_time": "11:00",
+    "closing_time": "22:30",
+    "items": [
+      {
+        "key": "chicken-katsu",
+        "name": "Chicken Katsu Curry",
+        "category": "Japanese Rice Bowls",
+        "description": "Crispy breaded chicken with Japanese-style curry sauce, steamed rice and sesame seeds.",
+        "price": 1195,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/chicken-katsu.jpg"
+      },
+      {
+        "key": "teriyaki-chicken",
+        "name": "Teriyaki Chicken Rice Bowl",
+        "category": "Japanese Rice Bowls",
+        "description": "Glazed teriyaki chicken over steamed rice, finished with sesame seeds and spring onion.",
+        "price": 1095,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/teriyaki-chicken.jpg"
+      },
+      {
+        "key": "salmon-rolls",
+        "name": "Salmon Sushi Rolls",
+        "category": "Sushi Rolls",
+        "description": "Salmon-coated sushi rice rolls with cucumber and cream cheese, served with soy sauce.",
+        "price": 895,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/salmon-rolls.jpg"
+      },
+      {
+        "key": "vegetable-rolls",
+        "name": "Vegetable Sushi Rolls",
+        "category": "Sushi Rolls",
+        "description": "Avocado, cucumber and carrot rolled in seasoned sushi rice and nori.",
+        "price": 745,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/vegetable-rolls.jpg"
+      },
+      {
+        "key": "chicken-ramen",
+        "name": "Chicken Ramen",
+        "category": "Japanese Noodles",
+        "description": "Wheat noodles in a warming savoury broth with chicken, a soft-boiled egg and greens.",
+        "price": 1245,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/chicken-ramen.jpg"
+      },
+      {
+        "key": "gyoza",
+        "name": "Pan-fried Gyoza",
+        "category": "Japanese Sides",
+        "description": "Golden Japanese-style dumplings with a savoury filling, served with soy dipping sauce and a small salad.",
+        "price": 645,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/gyoza.jpg"
+      },
+      {
+        "key": "yakisoba",
+        "name": "Chicken & Prawn Yakisoba",
+        "category": "Japanese Noodles",
+        "description": "Stir-fried noodles with chicken, prawns, cabbage and carrots in a savoury Japanese-style sauce.",
+        "price": 1295,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/yakisoba.jpg"
+      },
+      {
+        "key": "mochi",
+        "name": "Assorted Mochi Trio",
+        "category": "Japanese Desserts",
+        "description": "Three soft Japanese-style mochi rice cakes with assorted sweet fillings.",
+        "price": 595,
+        "available": true,
+        "image_url": "/demo-images/photos/menu/tokyo-bento-kitchen/mochi.jpg"
+      }
+    ],
+    "image_url": "/demo-images/photos/covers/tokyo-bento-kitchen.jpg"
+  }
+]

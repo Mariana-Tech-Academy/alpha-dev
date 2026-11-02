@@ -19,4 +19,6 @@ type CartViewResponse struct {
 	RestaurantID *uint              `json:"restaurant_id,omitempty"`
 	Items        []CartItemResponse `json:"items"`
 	Subtotal     int64              `json:"subtotal"`
+	DeliveryFee  int64              `json:"delivery_fee"`
+	Total        int64              `json:"total"`
 }

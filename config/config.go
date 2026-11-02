@@ -10,6 +10,7 @@ import (
 )
 
 type Config struct {
+	DemoSafeStart      bool
 	Port               string
 	JWTSecret          string
 	JWTExpiry          time.Duration
@@ -41,6 +42,11 @@ func Load() (*Config, error) {
 		}
 	}
 
+	safe, err := demoSafeStart(os.Getenv)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DemoSafeStart = safe
 	return cfg, nil
 }
 

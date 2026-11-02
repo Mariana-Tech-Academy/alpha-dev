@@ -146,3 +146,32 @@ func TestOrderHistoryReturnsDatabaseError(t *testing.T) {
 		t.Fatalf("expected database error, got %v", err)
 	}
 }
+
+func TestHistoryUsesPurchasedSnapshotsEvenWhenRestaurantHasNoCover(t *testing.T) {
+	repo := &orderHistoryRepoStub{total: 1, orders: []models.Order{{
+		Model: gorm.Model{ID: 22}, CustomerID: 7, RestaurantID: 1,
+		Restaurant: models.Restaurant{Name: "FoodHub Test Restaurant", ImageURL: ""},
+		Status:     models.OrderStatusPending, Subtotal: 2500, DeliveryFee: 100, Total: 2600,
+		DeliveryName: "Saved customer", DeliveryPhone: "07000000000", DeliveryAddress: "12 Saved Street",
+		DeliveryCity: "London", DeliveryState: "Greater London", DeliveryInstructions: "Ring once",
+		Items: []models.OrderItem{{Name: "Purchased burger", UnitPrice: 1250, Quantity: 2, LineTotal: 2500,
+			MenuItem: models.MenuItem{Name: "Renamed current dish", Price: 9999}}},
+	}}}
+	history, err := NewOrderService(repo).GetOrderHistory(context.Background(), 7, 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repo.customerID != 7 || len(history.Orders) != 1 {
+		t.Fatal("wrong customer or hidden historical order")
+	}
+	order := history.Orders[0]
+	if order.RestaurantName != "FoodHub Test Restaurant" || order.Status != models.OrderStatusPending || order.Subtotal != 2500 || order.DeliveryFee != 100 || order.Total != 2600 {
+		t.Fatalf("wrong order: %+v", order)
+	}
+	if len(order.Items) != 1 || order.Items[0].Name != "Purchased burger" || order.Items[0].UnitPrice != 1250 || order.Items[0].Quantity != 2 || order.Items[0].LineTotal != 2500 {
+		t.Fatalf("snapshot was replaced: %+v", order.Items)
+	}
+	if order.DeliveryName != "Saved customer" || order.DeliveryPhone != "07000000000" || order.DeliveryAddress != "12 Saved Street" || order.DeliveryCity != "London" || order.DeliveryState != "Greater London" || order.DeliveryInstructions != "Ring once" {
+		t.Fatal("saved delivery snapshot missing")
+	}
+}

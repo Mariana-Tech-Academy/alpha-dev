@@ -78,13 +78,22 @@ type PlacedOrder struct {
 }
 
 type OrderHistoryItem struct {
-	ID             uint               `json:"id"`
-	OrderNumber    string             `json:"order_number"`
-	RestaurantID   uint               `json:"restaurant_id"`
-	RestaurantName string             `json:"restaurant_name"`
-	Total          int64              `json:"total"`
-	Status         models.OrderStatus `json:"status"`
-	CreatedAt      time.Time          `json:"created_at"`
+	Items                []PlacedOrderItem  `json:"items"`
+	Subtotal             int64              `json:"subtotal"`
+	DeliveryFee          int64              `json:"delivery_fee"`
+	DeliveryName         string             `json:"delivery_name,omitempty"`
+	DeliveryPhone        string             `json:"delivery_phone,omitempty"`
+	DeliveryAddress      string             `json:"delivery_address,omitempty"`
+	DeliveryCity         string             `json:"delivery_city,omitempty"`
+	DeliveryState        string             `json:"delivery_state,omitempty"`
+	DeliveryInstructions string             `json:"delivery_instructions,omitempty"`
+	ID                   uint               `json:"id"`
+	OrderNumber          string             `json:"order_number"`
+	RestaurantID         uint               `json:"restaurant_id"`
+	RestaurantName       string             `json:"restaurant_name"`
+	Total                int64              `json:"total"`
+	Status               models.OrderStatus `json:"status"`
+	CreatedAt            time.Time          `json:"created_at"`
 }
 
 type OrderHistory struct {
@@ -104,6 +113,7 @@ type UpdatedOrder struct {
 }
 
 type OrderService interface {
+	AdvanceDemoOrder(ctx context.Context, userID uint, role models.Role, orderID uint, expected models.OrderStatus) (UpdatedOrder, error)
 	PlaceOrder(ctx context.Context, userID uint, req PlaceOrderRequest) (PlacedOrder, error)
 	GetOrderHistory(ctx context.Context, customerID uint, page, limit int) (OrderHistory, error)
 	UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error)
@@ -227,14 +237,27 @@ func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, pag
 
 	items := make([]OrderHistoryItem, 0, len(orders))
 	for _, order := range orders {
+		snapshots := make([]PlacedOrderItem, 0, len(order.Items))
+		for _, line := range order.Items {
+			snapshots = append(snapshots, PlacedOrderItem{Name: line.Name, UnitPrice: line.UnitPrice, Quantity: line.Quantity, LineTotal: line.LineTotal})
+		}
 		items = append(items, OrderHistoryItem{
-			ID:             order.ID,
-			OrderNumber:    order.OrderNumber,
-			RestaurantID:   order.RestaurantID,
-			RestaurantName: order.Restaurant.Name,
-			Total:          order.Total,
-			Status:         order.Status,
-			CreatedAt:      order.CreatedAt,
+			Items:                snapshots,
+			Subtotal:             order.Subtotal,
+			DeliveryFee:          order.DeliveryFee,
+			DeliveryName:         order.DeliveryName,
+			DeliveryPhone:        order.DeliveryPhone,
+			DeliveryAddress:      order.DeliveryAddress,
+			DeliveryCity:         order.DeliveryCity,
+			DeliveryState:        order.DeliveryState,
+			DeliveryInstructions: order.DeliveryInstructions,
+			ID:                   order.ID,
+			OrderNumber:          order.OrderNumber,
+			RestaurantID:         order.RestaurantID,
+			RestaurantName:       order.Restaurant.Name,
+			Total:                order.Total,
+			Status:               order.Status,
+			CreatedAt:            order.CreatedAt,
 		})
 	}
 	return OrderHistory{
@@ -246,13 +269,30 @@ func (s *orderService) GetOrderHistory(ctx context.Context, customerID uint, pag
 }
 
 func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus) (UpdatedOrder, error) {
+	return s.updateStatus(ctx, userID, role, orderID, next, nil)
+}
+
+// A separate, gated demo operation uses native persisted values for four stages.
+func (s *orderService) AdvanceDemoOrder(ctx context.Context, userID uint, role models.Role, orderID uint, expected models.OrderStatus) (UpdatedOrder, error) {
+	next := map[models.OrderStatus]models.OrderStatus{
+		models.OrderStatusPending:          models.OrderStatusPreparing,
+		models.OrderStatusConfirmed:        models.OrderStatusPreparing,
+		models.OrderStatusPreparing:        models.OrderStatusOutForDelivery,
+		models.OrderStatusReadyForDelivery: models.OrderStatusOutForDelivery,
+		models.OrderStatusOutForDelivery:   models.OrderStatusDelivered,
+	}[expected]
+	return s.updateStatus(ctx, userID, role, orderID, next, &expected)
+}
+
+func (s *orderService) updateStatus(ctx context.Context, userID uint, role models.Role, orderID uint, next models.OrderStatus, expected *models.OrderStatus) (UpdatedOrder, error) {
+
 	if userID == 0 {
 		return UpdatedOrder{}, ErrInvalidUser
 	}
 	if role != models.RoleManager && role != models.RoleAdmin {
 		return UpdatedOrder{}, ErrOrderForbidden
 	}
-	if !next.IsValid() {
+	if expected == nil && !next.IsValid() {
 		return UpdatedOrder{}, ErrInvalidOrderStatus
 	}
 
@@ -268,6 +308,16 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, userID uint, role 
 	}
 
 	allowed, ok := order.Status.Next()
+	if expected != nil {
+		if !expected.IsValid() {
+			return UpdatedOrder{}, ErrInvalidOrderStatus
+		}
+		if order.Status != *expected {
+			return UpdatedOrder{}, ErrOrderChanged
+		}
+		allowed = next
+		ok = next != ""
+	}
 	if !ok || next != allowed {
 		return UpdatedOrder{}, &OrderTransitionError{From: order.Status, To: next, Allowed: allowed}
 	}

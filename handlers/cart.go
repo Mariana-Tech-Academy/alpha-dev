@@ -173,3 +173,36 @@ func (h *CartHandler) UpdateQuantity(w http.ResponseWriter, r *http.Request) {
 
 	utils.Success(w, http.StatusOK, "cart quantity updated", cart)
 }
+
+// DELETE /cart clears the basket; DELETE /cart/items/{id} removes one line.
+func (h *CartHandler) RemoveItems(w http.ResponseWriter, r *http.Request) {
+	claims, err := auth.ClaimsFromContext(r.Context())
+	if err != nil {
+		utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+	var itemID *uint
+	if raw, ok := mux.Vars(r)["id"]; ok {
+		parsed, err := strconv.ParseUint(raw, 10, strconv.IntSize)
+		if err != nil || parsed == 0 {
+			utils.Error(w, http.StatusBadRequest, "invalid cart item ID")
+			return
+		}
+		id := uint(parsed)
+		itemID = &id
+	}
+	cart, err := h.CartService.RemoveItems(r.Context(), claims.UserID, itemID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrInvalidUser):
+			utils.Error(w, http.StatusUnauthorized, "unauthenticated")
+		case errors.Is(err, service.ErrCartItemNotFound):
+			utils.Error(w, http.StatusNotFound, "cart item not found")
+		default:
+			log.Printf("remove cart items: %v", err)
+			utils.Error(w, http.StatusInternalServerError, "unable to update basket")
+		}
+		return
+	}
+	utils.Success(w, http.StatusOK, "basket updated", cart)
+}
